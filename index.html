@@ -517,7 +517,7 @@ async function lerPDF(input, tipo) {
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': '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', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
