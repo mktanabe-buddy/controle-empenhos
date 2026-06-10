@@ -532,8 +532,12 @@ async function lerPDF(input, tipo) {
     });
 
     const data = await resp.json();
+    if (!resp.ok || !data.content) {
+      throw new Error(data.error ? data.error.message : 'Erro na API: ' + resp.status);
+    }
     const txt = data.content.map(c => c.text || '').join('').replace(/```json|```/g, '').trim();
-    const p = JSON.parse(txt);
+    let p;
+    try { p = JSON.parse(txt); } catch(je) { throw new Error('IA não retornou JSON válido: ' + txt.substring(0, 100)); }
 
     if (tipo === 'emp') {
       if (p.empenho) document.getElementById('fe-emp').value = p.empenho;
