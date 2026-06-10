@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controle de Empenhos</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f8f8f6;color:#1a1a1a;font-size:14px}
+.topbar{background:#fff;border-bottom:1px solid #e8e8e4;padding:12px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:16px;font-weight:500}
+.sync{margin-left:auto;font-size:12px;color:#888}
+.container{max-width:1200px;margin:0 auto;padding:24px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.metric{background:#fff;border:1px solid #e8e8e4;border-radius:10px;padding:14px 16px}
+.metric-val{font-size:22px;font-weight:500}
+.metric-lbl{font-size:12px;color:#888;margin-top:2px}
+.card{background:#fff;border:1px solid #e8e8e4;border-radius:10px;padding:16px;margin-bottom:16px}
+.tabs{display:flex;gap:2px;margin-bottom:20px;background:#f0f0ec;border-radius:8px;padding:3px}
+.tab{padding:7px 16px;font-size:13px;cursor:pointer;border:none;background:none;border-radius:6px;color:#666;font-family:system-ui}
+.tab.active{background:#fff;color:#1a1a1a;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.section{display:none}.section.active{display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 10px;color:#888;border-bottom:1px solid #e8e8e4;font-weight:500;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #e8e8e4;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500}
+.b-ok{background:#e8f5e9;color:#2e7d32}
+.b-warn{background:#fff8e1;color:#f57f17}
+.b-danger{background:#fce4ec;color:#c62828}
+.b-info{background:#e3f2fd;color:#1565c0}
+.b-fat{background:#e8f5e9;color:#1b5e20}
+input,select,textarea{padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#1a1a1a;font-family:system-ui;width:100%}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;color:#666}
+.form-group.full{grid-column:1/-1}
+.btn{padding:8px 14px;font-size:13px;border:1px solid #ddd;border-radius:8px;cursor:pointer;background:#fff;color:#1a1a1a;display:inline-flex;align-items:center;gap:6px;font-family:system-ui}
+.btn:hover{background:#f5f5f3}
+.btn-primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btn-primary:hover{background:#333}
+.btn-sm{padding:4px 8px;font-size:12px}
+.upload-zone{border:2px dashed #ddd;border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:background .15s}
+.upload-zone:hover{background:#fafaf8}
+.ai-box{background:#e3f2fd;border-radius:8px;padding:10px 14px;font-size:13px;color:#1565c0;margin-bottom:12px;display:flex;gap:8px;align-items:flex-start}
+.prazo-bar{height:4px;border-radius:2px;background:#eee;margin-top:3px;overflow:hidden}
+.prazo-fill{height:100%;border-radius:2px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #b3d4f5;border-top-color:#1565c0;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:4px;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;width:520px;max-width:95vw;max-height:85vh;overflow-y:auto}
+.modal h3{font-size:15px;font-weight:500;margin-bottom:12px}
+.prorrog-pre{background:#f5f5f3;border-radius:8px;padding:14px;font-size:13px;line-height:1.8;white-space:pre-wrap;margin:12px 0;border:1px solid #e8e8e4;max-height:300px;overflow-y:auto}
+.toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:200;display:none}
+.toast.show{display:block}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <i class="ti ti-file-invoice" style="font-size:20px"></i>
+  <h1>Controle de Empenhos</h1>
+  <span class="sync" id="sync-status"><span class="spinner"></span> Conectando...</span>
+</div>
+
+<div class="container">
+
+  <div class="metrics">
+    <div class="metric"><div class="metric-val" id="m-total">—</div><div class="metric-lbl">Total de empenhos</div></div>
+    <div class="metric"><div class="metric-val" style="color:#c62828" id="m-venc">—</div><div class="metric-lbl">Vencendo em 7 dias</div></div>
+    <div class="metric"><div class="metric-val" style="color:#f57f17" id="m-prorr">—</div><div class="metric-lbl">Sol. prorrogação</div></div>
+    <div class="metric"><div class="metric-val" style="color:#2e7d32" id="m-fat">—</div><div class="metric-lbl">Faturados</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('painel',this)"><i class="ti ti-layout-dashboard"></i> Painel</button>
+    <button class="tab" onclick="showTab('novo',this)"><i class="ti ti-plus"></i> Novo empenho</button>
+    <button class="tab" onclick="showTab('nf',this)"><i class="ti ti-file-invoice"></i> Registrar NF</button>
+    <button class="tab" onclick="showTab('prorrog',this)"><i class="ti ti-clock-exclamation"></i> Prorrogações</button>
+  </div>
+
+  <!-- PAINEL -->
+  <div id="painel" class="section active">
+    <div class="card" style="padding:10px 16px;display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <select id="f-owner" onchange="renderTabela()" style="width:auto">
+        <option value="">Todos os responsáveis</option>
+      </select>
+      <select id="f-status" onchange="renderTabela()" style="width:auto">
+        <option value="">Todos os status</option>
+        <option value="ok">Em dia</option>
+        <option value="vencendo">Vencendo</option>
+        <option value="vencido">Vencido</option>
+        <option value="faturado">Faturado</option>
+        <option value="prorrog">Sol. prorrogação</option>
+      </select>
+      <button class="btn" onclick="syncSheets()" style="margin-left:auto"><i class="ti ti-refresh"></i> Atualizar</button>
+      <span style="font-size:12px;color:#888" id="cnt"></span>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Status</th><th>Empenho</th><th>Cliente</th><th>Responsável</th>
+            <th>Item</th><th>Qtd</th><th>Total R$</th><th>Vencimento</th><th>NF</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOVO EMPENHO -->
+  <div id="novo" class="section">
+    <div class="card">
+      <div class="ai-box">
+        <i class="ti ti-sparkles" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+        Faça upload do PDF do empenho para preenchimento automático com IA, ou preencha manualmente.
+      </div>
+      <div class="upload-zone" onclick="document.getElementById('f-pdf-emp').click()">
+        <input type="file" id="f-pdf-emp" accept=".pdf" style="display:none" onchange="lerPDF(this,'emp')">
+        <i class="ti ti-upload" style="font-size:28px;color:#aaa;display:block;margin-bottom:6px"></i>
+        <div style="font-size:13px;font-weight:500">Clique para anexar o PDF do empenho</div>
+        <div style="font-size:12px;color:#aaa;margin-top:4px">Extração automática de dados via IA</div>
+      </div>
+      <div id="ai-emp-status" class="ai-box" style="display:none;margin-top:12px">
+        <span class="spinner"></span><span id="ai-emp-msg">Lendo PDF...</span>
+      </div>
+      <div style="margin-top:16px" class="form-grid">
+        <div class="form-group"><label>Nº do empenho</label><input id="fe-emp" placeholder="2025NE001055"></div>
+        <div class="form-group"><label>Razão social</label><input id="fe-razao" placeholder="Nome do órgão"></div>
+        <div class="form-group"><label>CNPJ</label><input id="fe-cnpj" placeholder="00.000.000/0000-00"></div>
+        <div class="form-group"><label>Responsável</label>
+          <select id="fe-owner">
+            <option>Tanabe</option><option>rosi</option><option>Henrique</option><option>nilton</option>
+          </select>
+        </div>
+        <div class="form-group full"><label>Descrição do item</label><input id="fe-item" placeholder="Ex: HP Z2 G9 TWR i7-14700 32GB/1TB"></div>
+        <div class="form-group"><label>SKU / Part number</label><input id="fe-sku" placeholder="BG6F0LS#AK4"></div>
+        <div class="form-group"><label>Quantidade</label><input type="number" id="fe-qtd" placeholder="1"></div>
+        <div class="form-group"><label>Valor unitário R$</label><input type="number" id="fe-unit" placeholder="10200"></div>
+        <div class="form-group"><label>Data de vencimento</label><input type="date" id="fe-venc"></div>
+        <div class="form-group"><label>Prazo de entrega (dias)</label><input id="fe-prazo" placeholder="30"></div>
+        <div class="form-group full"><label>Observações</label><textarea id="fe-obs" rows="2" placeholder="Observações adicionais"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn" onclick="limpar()"><i class="ti ti-x"></i> Limpar</button>
+        <button class="btn btn-primary" onclick="salvar()"><i class="ti ti-device-floppy"></i> Salvar no Sheets</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REGISTRAR NF -->
+  <div id="nf" class="section">
+    <div class="card">
+      <div class="ai-box">
+        <i class="ti ti-sparkles" style="font-size:16px;flex-shrink:0;margin-top:1px"></i>
+        Faça upload do PDF da nota fiscal para extração automática dos dados.
+      </div>
+      <div class="upload-zone" onclick="document.getElementById('f-pdf-nf').click()">
+        <input type="file" id="f-pdf-nf" accept=".pdf" style="display:none" onchange="lerPDF(this,'nf')">
+        <i class="ti ti-file-invoice" style="font-size:28px;color:#aaa;display:block;margin-bottom:6px"></i>
+        <div style="font-size:13px;font-weight:500">Clique para anexar o PDF da nota fiscal</div>
+      </div>
+      <div id="ai-nf-status" class="ai-box" style="display:none;margin-top:12px">
+        <span class="spinner"></span><span id="ai-nf-msg">Lendo NF...</span>
+      </div>
+      <div style="margin-top:16px" class="form-grid">
+        <div class="form-group full"><label>Empenho a vincular</label><select id="nf-sel"></select></div>
+        <div class="form-group"><label>Número da NF</label><input id="nf-num" placeholder="48463"></div>
+        <div class="form-group"><label>Data de emissão</label><input type="date" id="nf-dt"></div>
+        <div class="form-group"><label>Valor R$</label><input type="number" id="nf-val"></div>
+        <div class="form-group full"><label>Observações</label><textarea id="nf-obs" rows="2"></textarea></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px">
+        <button class="btn btn-primary" onclick="vincularNF()"><i class="ti ti-check"></i> Vincular NF ao empenho</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRORROGAÇÕES -->
+  <div id="prorrog" class="section">
+    <div class="card">
+      <div style="font-size:13px;color:#888;margin-bottom:12px">Empenhos vencidos ou vencendo em até 7 dias.</div>
+      <table>
+        <thead><tr><th>Empenho</th><th>Cliente</th><th>Responsável</th><th>Vencimento</th><th>Situação</th><th></th></tr></thead>
+        <tbody id="tb-prorr"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL PRORROGAÇÃO -->
+<div class="overlay" id="modal-p">
+  <div class="modal">
+    <h3><i class="ti ti-file-text"></i> Pedido de prorrogação</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Novo prazo (dias)</label>
+        <input type="number" id="p-dias" value="30" oninput="atualizarPrev()">
+      </div>
+      <div class="form-group">
+        <label>Motivo</label>
+        <select id="p-motivo" onchange="atualizarPrev()">
+          <option>indisponibilidade de estoque pelo fabricante</option>
+          <option>atraso na cadeia de suprimentos</option>
+          <option>prazo insuficiente para logística de entrega</option>
+          <option>necessidade de adequação técnica do produto</option>
+        </select>
+      </div>
+    </div>
+    <div class="prorrog-pre" id="p-prev"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" onclick="document.getElementById('modal-p').classList.remove('open')">Fechar</button>
+      <button class="btn btn-primary" onclick="copiarPrev()"><i class="ti ti-copy"></i> Copiar texto</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEB_APP = 'https://script.google.com/macros/s/AKfycbwQxxCjiOhZa8HvrzWB9ssksoUl8CQhTf3sPPrEi3zfodUWTcCPjz3kgRVZx34MJEHE/exec';
+
+let empenhos = [];
+let empIdx = null;
+
+function toast(msg, dur) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur || 2500);
+}
+
+async function syncSheets() {
+  document.getElementById('sync-status').innerHTML = '<span class="spinner"></span> Sincronizando...';
+  try {
+    const r = await fetch(WEB_APP + '?action=list');
+    const rows = await r.json();
+    if (!rows || rows.length <= 1) {
+      empenhos = [];
+    } else {
+      empenhos = rows.slice(1)
+        .filter(r => r[0])
+        .map(r => ({
+          id: r[0], empenho: r[1], razao: r[2], cnpj: r[3],
+          owner: r[4], item: r[5], sku: r[6],
+          qtd: r[7], unit: r[8], total: r[9],
+          venc: r[10], prazo: r[11], obs: r[12],
+          nf: r[13], nfData: r[14], nfValor: r[15]
+        }));
+    }
+    renderTabela();
+    document.getElementById('sync-status').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+  } catch (e) {
+    document.getElementById('sync-status').textContent = 'Erro ao conectar ao Sheets';
+  }
+}
+
+function diasAteVencer(dt) {
+  if (!dt) return null;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const d = new Date(dt + 'T12:00:00');
+  return Math.round((d - hoje) / 86400000);
+}
+
+function statusEmp(e) {
+  if (e.nf) return 'faturado';
+  if (String(e.prazo).toLowerCase().includes('prorrog')) return 'prorrog';
+  const d = diasAteVencer(e.venc);
+  if (d === null) return 'ok';
+  if (d < 0) return 'vencido';
+  if (d <= 7) return 'vencendo';
+  return 'ok';
+}
+
+function badgeHtml(s) {
+  const m = {
+    faturado: ['b-fat', 'Faturado'],
+    prorrog: ['b-info', 'Sol. prorrog.'],
+    vencido: ['b-danger', 'Vencido'],
+    vencendo: ['b-warn', 'Vencendo'],
+    ok: ['b-ok', 'Em dia']
+  };
+  const [cls, txt] = m[s] || ['b-info', s];
+  return `<span class="badge ${cls}">${txt}</span>`;
+}
+
+function fmt(v) {
+  if (!v && v !== 0) return '-';
+  return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDt(dt) {
+  if (!dt) return '-';
+  return new Date(dt + 'T12:00:00').toLocaleDateString('pt-BR');
+}
+
+function renderTabela() {
+  const owner = document.getElementById('f-owner').value;
+  const status = document.getElementById('f-status').value;
+  const lista = empenhos.filter(e => {
+    if (owner && e.owner !== owner) return false;
+    if (status && statusEmp(e) !== status) return false;
+    return true;
+  });
+
+  const tb = document.getElementById('tb');
+  if (!lista.length) {
+    tb.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#888">Nenhum empenho encontrado. Adicione via "Novo empenho".</td></tr>';
+  } else {
+    tb.innerHTML = lista.map(e => {
+      const s = statusEmp(e);
+      const dias = diasAteVencer(e.venc);
+      const pct = dias !== null ? Math.max(0, Math.min(100, Math.round((dias / 30) * 100))) : 100;
+      const bc = s === 'vencido' ? '#c62828' : s === 'vencendo' ? '#f57f17' : '#2e7d32';
+      const idx = empenhos.indexOf(e);
+      return `<tr>
+        <td>${badgeHtml(s)}</td>
+        <td style="font-size:12px;white-space:nowrap">${e.empenho || '-'}</td>
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.razao || '-'}</td>
+        <td>${e.owner || '-'}</td>
+        <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${e.item || '-'}</td>
+        <td>${e.qtd || '-'}</td>
+        <td style="white-space:nowrap">R$ ${fmt(e.total)}</td>
+        <td style="white-space:nowrap">${fmtDt(e.venc)}<div class="prazo-bar"><div class="prazo-fill" style="width:${pct}%;background:${bc}"></div></div></td>
+        <td style="font-size:12px">${e.nf || '-'}</td>
+        <td style="white-space:nowrap">
+          ${s !== 'faturado' ? `<button class="btn btn-sm" onclick="abrirModal(${idx})" title="Gerar prorrogação"><i class="ti ti-clock-plus"></i></button> ` : ''}
+          <button class="btn btn-sm" onclick="excluir('${e.id}')" title="Excluir"><i class="ti ti-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('cnt').textContent = lista.length + ' registro' + (lista.length !== 1 ? 's' : '');
+  document.getElementById('m-total').textContent = empenhos.length;
+  document.getElementById('m-venc').textContent = empenhos.filter(e => { const d = diasAteVencer(e.venc); return d !== null && d >= 0 && d <= 7 && !e.nf; }).length;
+  document.getElementById('m-prorr').textContent = empenhos.filter(e => statusEmp(e) === 'prorrog').length;
+  document.getElementById('m-fat').textContent = empenhos.filter(e => e.nf).length;
+
+  const owners = [...new Set(empenhos.map(e => e.owner).filter(Boolean))];
+  const fo = document.getElementById('f-owner');
+  const ov = fo.value;
+  fo.innerHTML = '<option value="">Todos os responsáveis</option>' + owners.map(o => `<option${o === ov ? ' selected' : ''}>${o}</option>`).join('');
+
+  renderProrr();
+
+  const ns = document.getElementById('nf-sel');
+  const naoFat = empenhos.filter(e => !e.nf);
+  ns.innerHTML = naoFat.length
+    ? naoFat.map(e => `<option value="${empenhos.indexOf(e)}">${e.empenho || '—'} — ${e.razao || ''}</option>`).join('')
+    : '<option>Nenhum empenho pendente</option>';
+}
+
+function renderProrr() {
+  const lista = empenhos.filter(e => {
+    const d = diasAteVencer(e.venc);
+    return !e.nf && ((d !== null && d <= 7) || statusEmp(e) === 'prorrog');
+  });
+  const tb = document.getElementById('tb-prorr');
+  if (!lista.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:#888">Nenhum empenho necessitando prorrogação.</td></tr>';
+    return;
+  }
+  tb.innerHTML = lista.map(e => {
+    const d = diasAteVencer(e.venc);
+    const ds = d === null ? '-' : d < 0
+      ? `<span style="color:#c62828;font-weight:500">${Math.abs(d)} dias vencido</span>`
+      : `<span style="color:#f57f17;font-weight:500">${d} dias restantes</span>`;
+    return `<tr>
+      <td style="font-size:12px">${e.empenho || '-'}</td>
+      <td>${e.razao || '-'}</td>
+      <td>${e.owner || '-'}</td>
+      <td>${fmtDt(e.venc)}</td>
+      <td>${ds}</td>
+      <td><button class="btn" onclick="abrirModal(${empenhos.indexOf(e)})"><i class="ti ti-file-plus"></i> Gerar</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function salvar() {
+  const qtd = parseFloat(document.getElementById('fe-qtd').value) || 0;
+  const unit = parseFloat(document.getElementById('fe-unit').value) || 0;
+  const emp = document.getElementById('fe-emp').value.trim();
+  const razao = document.getElementById('fe-razao').value.trim();
+  if (!emp && !razao) { alert('Preencha ao menos o nº do empenho ou a razão social.'); return; }
+
+  const id = Date.now().toString();
+  const row = [
+    id, emp, razao,
+    document.getElementById('fe-cnpj').value.trim(),
+    document.getElementById('fe-owner').value,
+    document.getElementById('fe-item').value.trim(),
+    document.getElementById('fe-sku').value.trim(),
+    qtd, unit, qtd && unit ? qtd * unit : unit,
+    document.getElementById('fe-venc').value,
+    document.getElementById('fe-prazo').value,
+    document.getElementById('fe-obs').value.trim(),
+    '', '', ''
+  ];
+
+  try {
+    const r = await fetch(WEB_APP, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'save', row })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast('Empenho salvo no Sheets!');
+      limpar();
+      await syncSheets();
+      showTab('painel', document.querySelector('.tab'));
+    }
+  } catch (e) { alert('Erro ao salvar: ' + e.message); }
+}
+
+async function vincularNF() {
+  const idx = parseInt(document.getElementById('nf-sel').value);
+  if (isNaN(idx) || !empenhos[idx]) { alert('Selecione um empenho.'); return; }
+  const e = empenhos[idx];
+  const nfNum = document.getElementById('nf-num').value;
+  if (!nfNum) { alert('Informe o número da NF.'); return; }
+
+  try {
+    await fetch(WEB_APP, { method: 'POST', body: JSON.stringify({ action: 'update', id: e.id, col: 13, val: nfNum }) });
+    await fetch(WEB_APP, { method: 'POST', body: JSON.stringify({ action: 'update', id: e.id, col: 14, val: document.getElementById('nf-dt').value }) });
+    await fetch(WEB_APP, { method: 'POST', body: JSON.stringify({ action: 'update', id: e.id, col: 15, val: document.getElementById('nf-valor').value }) });
+    toast('NF vinculada com sucesso!');
+    document.getElementById('nf-num').value = '';
+    document.getElementById('nf-dt').value = '';
+    document.getElementById('nf-valor').value = '';
+    document.getElementById('nf-obs').value = '';
+    document.getElementById('ai-nf-status').style.display = 'none';
+    await syncSheets();
+  } catch (er) { alert('Erro: ' + er.message); }
+}
+
+async function excluir(id) {
+  if (!confirm('Excluir este empenho permanentemente?')) return;
+  try {
+    await fetch(WEB_APP, { method: 'POST', body: JSON.stringify({ action: 'delete', id }) });
+    toast('Empenho excluído.');
+    await syncSheets();
+  } catch (e) { alert('Erro: ' + e.message); }
+}
+
+function limpar() {
+  ['fe-emp','fe-razao','fe-cnpj','fe-item','fe-sku','fe-qtd','fe-unit','fe-venc','fe-prazo','fe-obs']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ai-emp-status').style.display = 'none';
+}
+
+function showTab(id, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+function abrirModal(idx) {
+  empIdx = idx;
+  atualizarPrev();
+  document.getElementById('modal-p').classList.add('open');
+}
+
+function atualizarPrev() {
+  if (empIdx === null) return;
+  const e = empenhos[empIdx];
+  const dias = document.getElementById('p-dias').value || 30;
+  const motivo = document.getElementById('p-motivo').value;
+  document.getElementById('p-prev').textContent =
+`Senhor(a) Gestor(a),
+
+Vimos por meio deste solicitar prorrogação do prazo de entrega referente ao Empenho nº ${e.empenho || '[empenho]'}, emitido em favor desta empresa pelo órgão ${e.razao || '[órgão]'}.
+
+Objeto: ${e.item || '[produto]'}
+Quantidade: ${e.qtd || '[qtd]'} unidade(s)
+Valor total: R$ ${fmt(e.total)}
+Prazo original: ${fmtDt(e.venc)}
+Novo prazo solicitado: ${dias} dias a partir da aprovação
+
+O motivo da solicitação é a ${motivo}, situação que impossibilita o cumprimento do prazo original.
+
+Atenciosamente,
+${new Date().toLocaleDateString('pt-BR')}`;
+}
+
+function copiarPrev() {
+  navigator.clipboard.writeText(document.getElementById('p-prev').textContent)
+    .then(() => toast('Texto copiado!'))
+    .catch(() => alert('Selecione e copie manualmente.'));
+}
+
+async function lerPDF(input, tipo) {
+  const file = input.files[0];
+  if (!file) return;
+  const sid = tipo === 'emp' ? 'ai-emp-status' : 'ai-nf-status';
+  const mid = tipo === 'emp' ? 'ai-emp-msg' : 'ai-nf-msg';
+  document.getElementById(sid).style.display = 'flex';
+  document.getElementById(mid).textContent = 'Lendo PDF com IA...';
+
+  try {
+    const b64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(',')[1]);
+      r.onerror = () => rej(new Error('Falha ao ler arquivo'));
+      r.readAsDataURL(file);
+    });
+
+    const prompt = tipo === 'emp'
+      ? 'Analise este empenho público brasileiro e retorne um JSON com as chaves: empenho (número do empenho), razao (razão social do órgão contratante), cnpj, item (descrição do produto), sku (part number ou SKU), qtd (quantidade como número), unit (valor unitário como número sem R$), total (valor total como número), venc (data de vencimento no formato YYYY-MM-DD), prazo (prazo de entrega em dias como número), obs. Retorne APENAS o JSON, sem markdown, sem texto adicional.'
+      : 'Analise esta nota fiscal brasileira e retorne JSON com: num_nf (número da NF), data_emissao (YYYY-MM-DD), valor_total (número), obs. Retorne APENAS o JSON, sem markdown.';
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    const data = await resp.json();
+    const txt = data.content.map(c => c.text || '').join('').replace(/```json|```/g, '').trim();
+    const p = JSON.parse(txt);
+
+    if (tipo === 'emp') {
+      if (p.empenho) document.getElementById('fe-emp').value = p.empenho;
+      if (p.razao)   document.getElementById('fe-razao').value = p.razao;
+      if (p.cnpj)    document.getElementById('fe-cnpj').value = p.cnpj;
+      if (p.item)    document.getElementById('fe-item').value = p.item;
+      if (p.sku)     document.getElementById('fe-sku').value = p.sku;
+      if (p.qtd)     document.getElementById('fe-qtd').value = p.qtd;
+      if (p.unit)    document.getElementById('fe-unit').value = p.unit;
+      if (p.venc)    document.getElementById('fe-venc').value = p.venc;
+      if (p.prazo)   document.getElementById('fe-prazo').value = p.prazo;
+      if (p.obs)     document.getElementById('fe-obs').value = p.obs;
+      document.getElementById(mid).textContent = '✓ Dados extraídos! Confira e salve.';
+    } else {
+      if (p.num_nf)       document.getElementById('nf-num').value = p.num_nf;
+      if (p.data_emissao) document.getElementById('nf-dt').value = p.data_emissao;
+      if (p.valor_total)  document.getElementById('nf-val').value = p.valor_total;
+      document.getElementById(mid).textContent = '✓ Dados da NF extraídos! Selecione o empenho e vincule.';
+    }
+  } catch (e) {
+    document.getElementById(mid).textContent = 'Erro ao processar: ' + e.message + '. Preencha manualmente.';
+  }
+}
+
+syncSheets();
+setInterval(syncSheets, 60000);
+</script>
+</body>
+</html>
