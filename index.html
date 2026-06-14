@@ -34,6 +34,7 @@ tr:hover td{background:#fafaf8}
 .b-fat{background:#e8f5e9;color:#1b5e20}
 .b-parcial{background:#f3e5f5;color:#6a1b9a}
 .b-pend{background:#fff3e0;color:#bf360c}
+.b-flag{background:#fce4ec;color:#b71c1c;border:1px solid #ef9a9a}
 input,select,textarea{padding:7px 10px;font-size:13px;border:1px solid #ddd;border-radius:7px;background:#fff;color:#1a1a1a;font-family:system-ui;width:100%}
 input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -65,9 +66,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
 .prorrog-pre{background:#f5f5f3;border-radius:8px;padding:14px;font-size:13px;line-height:1.8;white-space:pre-wrap;margin:12px 0;border:1px solid #e8e8e4;max-height:280px;overflow-y:auto}
 .toast{position:fixed;bottom:20px;right:20px;background:#1a1a1a;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
-.nf-result{border:1px solid #e8e8e4;border-radius:8px;padding:12px;margin-bottom:8px}
+.nf-result{border:1px solid #e8e8e4;border-radius:8px;padding:14px;margin-bottom:10px}
 .nf-result.match{border-color:#a5d6a7;background:#f9fff9}
-.nf-result.no-match{border-color:#ffcc80;background:#fffdf5}
+.nf-result.no-match{border-color:#ef9a9a;background:#fff8f8}
+.flag-box{background:#fce4ec;border:1px solid #ef9a9a;border-radius:7px;padding:8px 12px;font-size:12px;color:#b71c1c;display:flex;align-items:center;gap:6px;margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -75,7 +77,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
 <div class="topbar">
   <i class="ti ti-file-invoice" style="font-size:18px;color:#1a56db"></i>
   <h1>Controle de Empenhos</h1>
-  <div class="sync" id="sync-status"><span class="spinner" style="border-top-color:#999;border-color:#ddd;border-top-color:#999"></span> Carregando...</div>
+  <div class="sync" id="sync-status"><span class="spinner" style="border-color:#ddd;border-top-color:#999"></span> Carregando...</div>
 </div>
 
 <div class="container">
@@ -83,7 +85,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
     <div class="metric"><div class="metric-val" id="m-total">0</div><div class="metric-lbl">Total de itens</div></div>
     <div class="metric"><div class="metric-val" style="color:#c62828" id="m-venc">0</div><div class="metric-lbl">Vencendo em 7 dias</div></div>
     <div class="metric"><div class="metric-val" style="color:#e65100" id="m-prorr">0</div><div class="metric-lbl">Sol. prorrogação</div></div>
-    <div class="metric"><div class="metric-val" style="color:#6a1b9a" id="m-parcial">0</div><div class="metric-lbl">Fat. parcial</div></div>
+    <div class="metric"><div class="metric-val" style="color:#b71c1c" id="m-flag">0</div><div class="metric-lbl">🚩 Empenho não cadastrado</div></div>
     <div class="metric"><div class="metric-val" style="color:#2e7d32" id="m-fat">0</div><div class="metric-lbl">Faturados</div></div>
   </div>
 
@@ -94,6 +96,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
     <button class="tab" onclick="showTab('prorrog',this)"><i class="ti ti-clock-exclamation"></i> Prorrogações</button>
   </div>
 
+  <!-- PAINEL -->
   <div id="painel" class="section active">
     <div class="card" style="padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
       <select id="f-owner" onchange="renderTabela()" style="width:auto"><option value="">Todos os responsáveis</option></select>
@@ -102,8 +105,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
         <option value="ok">Em dia</option><option value="vencendo">Vencendo</option>
         <option value="vencido">Vencido</option><option value="faturado">Faturado</option>
         <option value="parcial">Fat. parcial</option><option value="prorrog">Sol. prorrogação</option>
+        <option value="flag">🚩 Empenho não cadastrado</option>
       </select>
-      <input type="text" id="f-busca" oninput="renderTabela()" placeholder="Buscar empenho, cliente, item..." style="width:220px">
+      <input type="text" id="f-busca" oninput="renderTabela()" placeholder="Buscar empenho, OC, cliente, item..." style="width:240px">
       <button class="btn" onclick="carregarDados()" style="margin-left:auto"><i class="ti ti-refresh"></i> Atualizar</button>
       <span style="font-size:12px;color:#999" id="cnt"></span>
     </div>
@@ -120,6 +124,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
     </div>
   </div>
 
+  <!-- NOVO EMPENHO -->
   <div id="novo" class="section">
     <div class="card">
       <div class="ai-box" id="ai-emp-box">
@@ -131,13 +136,13 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
         <input type="file" id="f-pdf-emp" accept=".pdf" style="display:none" onchange="lerPDFEmp(this)">
         <i class="ti ti-upload" style="font-size:26px;color:#bbb;display:block;margin-bottom:5px"></i>
         <div style="font-size:13px;font-weight:500">Clique para anexar o PDF do empenho</div>
-        <div style="font-size:11px;color:#bbb;margin-top:3px">Extração automática de todos os campos via IA</div>
+        <div style="font-size:11px;color:#bbb;margin-top:3px">Extração automática via IA</div>
       </div>
 
       <div class="section-label"><span>Identificação</span></div>
       <div class="form-grid-3">
         <div class="form-group"><label>Nº do empenho</label><input id="fe-emp" placeholder="4803/2026"></div>
-        <div class="form-group"><label>Nº da Ordem de Compra</label><input id="fe-oc" placeholder="3090/2026"></div>
+        <div class="form-group"><label>Nº da Ordem de Compra (OC)</label><input id="fe-oc" placeholder="3090/2026"></div>
         <div class="form-group"><label>Responsável</label>
           <select id="fe-owner"><option>Tanabe</option><option>rosi</option><option>Henrique</option><option>nilton</option></select>
         </div>
@@ -151,8 +156,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
 
       <div class="section-label"><span>Local de entrega</span></div>
       <div class="form-grid">
-        <div class="form-group"><label>Departamento / Setor</label><input id="fe-local-depto" placeholder="Departamento de TI (3º Andar)"></div>
-        <div class="form-group"><label>Local / Prédio</label><input id="fe-local-predio" placeholder="Paço Municipal Arlindo Alberto Lamb"></div>
+        <div class="form-group"><label>Departamento / Setor</label><input id="fe-local-depto" placeholder="Almoxarifado"></div>
+        <div class="form-group"><label>Local / Prédio</label><input id="fe-local-predio" placeholder="Paço Municipal..."></div>
         <div class="form-group full"><label>Endereço completo</label><input id="fe-local-end" placeholder="Rua Espírito Santo, 777 - Centro - Marechal Cândido Rondon - PR"></div>
       </div>
 
@@ -177,11 +182,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
     </div>
   </div>
 
+  <!-- REGISTRAR NF -->
   <div id="nf" class="section">
     <div class="card">
       <div class="ai-box">
         <i class="ti ti-sparkles" style="font-size:15px;flex-shrink:0"></i>
-        Faça upload de 1 ou mais PDFs de notas fiscais. A IA lê cada NF e vincula automaticamente ao empenho correspondente.
+        Faça upload de 1 ou mais PDFs de notas fiscais. A IA extrai todos os dados e vincula automaticamente ao empenho/OC correspondente via campo de Informações Complementares.
       </div>
       <div class="upload-zone" onclick="document.getElementById('f-pdf-nf').click()">
         <input type="file" id="f-pdf-nf" accept=".pdf" multiple style="display:none" onchange="processarNFs(this)">
@@ -191,11 +197,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
       </div>
       <div id="nf-resultados" style="margin-top:14px"></div>
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
-        <button class="btn btn-primary" id="btn-confirmar-nf" style="display:none" onclick="confirmarNFs()"><i class="ti ti-check"></i> Confirmar vínculos</button>
+        <button class="btn btn-primary" id="btn-confirmar-nf" style="display:none" onclick="confirmarNFs()"><i class="ti ti-check"></i> Confirmar e salvar</button>
       </div>
     </div>
   </div>
 
+  <!-- PRORROGAÇÕES -->
   <div id="prorrog" class="section">
     <div class="card">
       <div style="font-size:12px;color:#999;margin-bottom:12px">Itens vencidos ou vencendo em até 7 dias sem faturamento completo.</div>
@@ -207,6 +214,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
   </div>
 </div>
 
+<!-- MODAL PRORROGAÇÃO -->
 <div class="overlay" id="modal-p">
   <div class="modal">
     <h3><i class="ti ti-file-text" style="color:#1a56db"></i> Pedido de prorrogação</h3>
@@ -244,7 +252,14 @@ async function carregarDados(){
     const r=await fetch(WEB_APP+'?action=list');
     const rows=await r.json();
     if(!rows||rows.length<=1){itens=[];}
-    else{itens=rows.slice(1).filter(r=>r[0]).map(r=>({id:r[0],emp:r[1],oc:r[2],razao:r[3],cnpj:r[4],owner:r[5],modalidade:r[6],licitacao:r[7],contrato:r[8],emissao:r[9],localDepto:r[10],localPredio:r[11],localEnd:r[12],item:r[13],sku:r[14],qtd:r[15],unit:r[16],total:r[17],prazo:r[18],recebimento:r[19],venc:r[20],obs:r[21],nf:r[22],nfData:r[23],nfValor:r[24],nfObs:r[25],fatParcial:r[26]}));}
+    else{itens=rows.slice(1).filter(r=>r[0]).map(r=>({
+      id:r[0],emp:r[1],oc:r[2],razao:r[3],cnpj:r[4],owner:r[5],
+      modalidade:r[6],licitacao:r[7],contrato:r[8],emissao:r[9],
+      localDepto:r[10],localPredio:r[11],localEnd:r[12],
+      item:r[13],sku:r[14],qtd:r[15],unit:r[16],total:r[17],
+      prazo:r[18],recebimento:r[19],venc:r[20],obs:r[21],
+      nf:r[22],nfData:r[23],nfValor:r[24],nfObs:r[25],fatParcial:r[26],semEmpenho:r[27]
+    }));}
     renderTabela();
     document.getElementById('sync-status').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR');
   }catch(e){document.getElementById('sync-status').textContent='Erro ao conectar';}
@@ -253,6 +268,7 @@ async function carregarDados(){
 function diasAteVencer(dt){if(!dt)return null;const hoje=new Date();hoje.setHours(0,0,0,0);return Math.round((new Date(dt+'T12:00:00')-hoje)/86400000);}
 
 function statusItem(e){
+  if(e.semEmpenho==='1'||e.semEmpenho===1||e.semEmpenho===true)return'flag';
   if(e.nf&&!e.fatParcial)return'faturado';
   if(e.fatParcial)return'parcial';
   if(String(e.obs||'').toLowerCase().includes('prorrog'))return'prorrog';
@@ -260,7 +276,17 @@ function statusItem(e){
   if(d===null)return'ok';if(d<0)return'vencido';if(d<=7)return'vencendo';return'ok';
 }
 
-function badgeHtml(s){const m={faturado:['b-fat','Faturado'],parcial:['b-parcial','Fat. parcial'],prorrog:['b-info','Sol. prorrog.'],vencido:['b-danger','Vencido'],vencendo:['b-warn','Vencendo'],ok:['b-ok','Em dia']};const[cls,txt]=m[s]||['b-info',s];return`<span class="badge ${cls}">${txt}</span>`;}
+function badgeHtml(s){
+  const m={
+    faturado:['b-fat','Faturado'],parcial:['b-parcial','Fat. parcial'],
+    prorrog:['b-info','Sol. prorrog.'],vencido:['b-danger','Vencido'],
+    vencendo:['b-warn','Vencendo'],ok:['b-ok','Em dia'],
+    flag:['b-flag','🚩 Empenho não cadastrado']
+  };
+  const[cls,txt]=m[s]||['b-info',s];
+  return`<span class="badge ${cls}">${txt}</span>`;
+}
+
 function fmt(v){if(!v&&v!==0)return'-';return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtDt(dt){if(!dt)return'-';return new Date(dt+'T12:00:00').toLocaleDateString('pt-BR');}
 
@@ -271,11 +297,11 @@ function renderTabela(){
   const lista=itens.filter(e=>{
     if(owner&&e.owner!==owner)return false;
     if(status&&statusItem(e)!==status)return false;
-    if(busca&&!`${e.emp} ${e.oc} ${e.razao} ${e.item}`.toLowerCase().includes(busca))return false;
+    if(busca&&!`${e.emp} ${e.oc} ${e.razao} ${e.item} ${e.nf}`.toLowerCase().includes(busca))return false;
     return true;
   });
   const tb=document.getElementById('tb');
-  if(!lista.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:2rem;color:#bbb">Nenhum item encontrado. Adicione via "Novo empenho".</td></tr>';}
+  if(!lista.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:2rem;color:#bbb">Nenhum item encontrado.</td></tr>';}
   else{
     tb.innerHTML=lista.map(e=>{
       const s=statusItem(e);const dias=diasAteVencer(e.venc);
@@ -283,14 +309,29 @@ function renderTabela(){
       const bc=s==='vencido'?'#c62828':s==='vencendo'?'#e65100':'#2e7d32';
       const idx=itens.indexOf(e);
       const empLabel=[e.emp,e.oc].filter(Boolean).join(' / ');
-      return`<tr><td>${badgeHtml(s)}</td><td style="font-size:11.5px;white-space:nowrap">${empLabel||'-'}</td><td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.razao||'-'}</td><td>${e.owner||'-'}</td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.item||'-'}</td><td>${e.qtd||'-'}</td><td style="white-space:nowrap">R$ ${fmt(e.total)}</td><td style="white-space:nowrap">${fmtDt(e.venc)}<div class="prazo-bar"><div class="prazo-fill" style="width:${pct}%;background:${bc}"></div></div></td><td style="font-size:11.5px">${e.nf||'-'}</td><td style="white-space:nowrap">${s!=='faturado'?`<button class="btn btn-sm" onclick="abrirModal(${idx})"><i class="ti ti-clock-plus"></i></button> `:''}<button class="btn btn-sm btn-danger" onclick="excluir('${e.id}')"><i class="ti ti-trash"></i></button></td></tr>`;
+      return`<tr${s==='flag'?' style="background:#fff8f8"':''}>
+        <td>${badgeHtml(s)}</td>
+        <td style="font-size:11.5px;white-space:nowrap">${empLabel||'-'}</td>
+        <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.razao||'-'}</td>
+        <td>${e.owner||'-'}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.item||'-'}</td>
+        <td>${e.qtd||'-'}</td>
+        <td style="white-space:nowrap">R$ ${fmt(e.total)}</td>
+        <td style="white-space:nowrap">${fmtDt(e.venc)}<div class="prazo-bar"><div class="prazo-fill" style="width:${pct}%;background:${bc}"></div></div></td>
+        <td style="font-size:11.5px">${e.nf||'-'}</td>
+        <td style="white-space:nowrap">
+          ${s!=='faturado'&&s!=='flag'?`<button class="btn btn-sm" onclick="abrirModal(${idx})" title="Prorrogação"><i class="ti ti-clock-plus"></i></button> `:''}
+          ${s==='flag'?`<button class="btn btn-sm" onclick="vincularEmpenho(${idx})" title="Vincular empenho" style="background:#fce4ec;color:#b71c1c;border-color:#ef9a9a"><i class="ti ti-link"></i> Vincular</button> `:''}
+          <button class="btn btn-sm btn-danger" onclick="excluir('${e.id}')" title="Excluir"><i class="ti ti-trash"></i></button>
+        </td>
+      </tr>`;
     }).join('');
   }
   document.getElementById('cnt').textContent=lista.length+' item'+(lista.length!==1?'s':'');
   document.getElementById('m-total').textContent=itens.length;
-  document.getElementById('m-venc').textContent=itens.filter(e=>{const d=diasAteVencer(e.venc);return d!==null&&d>=0&&d<=7&&statusItem(e)!=='faturado';}).length;
+  document.getElementById('m-venc').textContent=itens.filter(e=>{const d=diasAteVencer(e.venc);return d!==null&&d>=0&&d<=7&&!['faturado','flag'].includes(statusItem(e));}).length;
   document.getElementById('m-prorr').textContent=itens.filter(e=>statusItem(e)==='prorrog').length;
-  document.getElementById('m-parcial').textContent=itens.filter(e=>e.fatParcial).length;
+  document.getElementById('m-flag').textContent=itens.filter(e=>statusItem(e)==='flag').length;
   document.getElementById('m-fat').textContent=itens.filter(e=>statusItem(e)==='faturado').length;
   const owners=[...new Set(itens.map(e=>e.owner).filter(Boolean))];
   const fo=document.getElementById('f-owner');const ov=fo.value;
@@ -299,7 +340,7 @@ function renderTabela(){
 }
 
 function renderProrr(){
-  const lista=itens.filter(e=>{const d=diasAteVencer(e.venc);return statusItem(e)!=='faturado'&&((d!==null&&d<=7)||statusItem(e)==='prorrog');});
+  const lista=itens.filter(e=>{const d=diasAteVencer(e.venc);return!['faturado','flag'].includes(statusItem(e))&&((d!==null&&d<=7)||statusItem(e)==='prorrog');});
   const tb=document.getElementById('tb-prorr');
   if(!lista.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:#bbb">Nenhum item necessitando prorrogação.</td></tr>';return;}
   tb.innerHTML=lista.map(e=>{
@@ -317,7 +358,7 @@ function addItemRow(dados){
   <div style="font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">Item ${id}</div>
   <div class="form-grid">
     <div class="form-group full"><label>Descrição do item</label><input id="item-desc-${id}" value="${dados?.item||''}" placeholder="Desktop Modelo 1 - Básico 14ª Geração..."></div>
-    <div class="form-group"><label>SKU / Part number / Marca-Modelo</label><input id="item-sku-${id}" value="${dados?.sku||''}" placeholder="HP HP 400 G9 SFF"></div>
+    <div class="form-group"><label>SKU / Part number</label><input id="item-sku-${id}" value="${dados?.sku||''}" placeholder="HP HP 400 G9 SFF"></div>
     <div class="form-group"><label>Quantidade</label><input type="number" id="item-qtd-${id}" value="${dados?.qtd||''}" placeholder="1" oninput="calcTotal(${id})"></div>
     <div class="form-group"><label>Valor unitário R$</label><input type="number" id="item-unit-${id}" value="${dados?.unit||''}" placeholder="5140,92" oninput="calcTotal(${id})"></div>
     <div class="form-group"><label>Total R$</label><input id="item-total-${id}" readonly style="background:#f5f5f3" value="${dados?.total||''}"></div>
@@ -343,14 +384,23 @@ async function salvar(){
   if(!emp&&!oc){alert('Preencha ao menos o nº do empenho ou da Ordem de Compra.');return;}
   const itensList=getItensDaForm();
   if(!itensList.length){alert('Adicione ao menos um item.');return;}
-  const base=['',emp,oc,razao,document.getElementById('fe-cnpj').value.trim(),document.getElementById('fe-owner').value,document.getElementById('fe-modalidade').value.trim(),document.getElementById('fe-licitacao').value.trim(),document.getElementById('fe-contrato').value.trim(),document.getElementById('fe-emissao').value,document.getElementById('fe-local-depto').value.trim(),document.getElementById('fe-local-predio').value.trim(),document.getElementById('fe-local-end').value.trim()];
+  const base=['',emp,oc,razao,
+    document.getElementById('fe-cnpj').value.trim(),
+    document.getElementById('fe-owner').value,
+    document.getElementById('fe-modalidade').value.trim(),
+    document.getElementById('fe-licitacao').value.trim(),
+    document.getElementById('fe-contrato').value.trim(),
+    document.getElementById('fe-emissao').value,
+    document.getElementById('fe-local-depto').value.trim(),
+    document.getElementById('fe-local-predio').value.trim(),
+    document.getElementById('fe-local-end').value.trim()];
   const prazo=document.getElementById('fe-prazo').value;
   const rec=document.getElementById('fe-recebimento').value;
   const venc=document.getElementById('fe-venc').value;
   const obs=document.getElementById('fe-obs').value.trim();
   try{
     for(const it of itensList){
-      const row=[...base,it.item,it.sku,it.qtd,it.unit,it.total,prazo,rec,venc,obs,'','','','',''];
+      const row=[...base,it.item,it.sku,it.qtd,it.unit,it.total,prazo,rec,venc,obs,'','','','','',''];
       row[0]=Date.now().toString()+Math.random().toString(36).substr(2,5);
       await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'save',row})});
     }
@@ -366,132 +416,206 @@ async function excluir(id){
 }
 
 function limpar(){
-  ['fe-emp','fe-oc','fe-razao','fe-cnpj','fe-modalidade','fe-licitacao','fe-contrato','fe-emissao','fe-local-depto','fe-local-predio','fe-local-end','fe-prazo','fe-recebimento','fe-venc','fe-obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fe-emp','fe-oc','fe-razao','fe-cnpj','fe-modalidade','fe-licitacao','fe-contrato','fe-emissao',
+   'fe-local-depto','fe-local-predio','fe-local-end','fe-prazo','fe-recebimento','fe-venc','fe-obs']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('itens-container').innerHTML='';itemCount=0;
   document.getElementById('ai-emp-msg').textContent='Faça upload do PDF do empenho para preenchimento automático, ou preencha manualmente.';
   document.getElementById('ai-spinner').style.display='none';
   document.getElementById('ai-icon').style.display='';
-  const hoje=new Date().toISOString().split('T')[0];
-  document.getElementById('fe-recebimento').value=hoje;
+  document.getElementById('fe-recebimento').value=new Date().toISOString().split('T')[0];
   addItemRow();
 }
 
-function showTab(id,btn){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');if(btn)btn.classList.add('active');}
+function showTab(id,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn)btn.classList.add('active');
+}
+
 function abrirModal(idx){empIdx=idx;atualizarPrev();document.getElementById('modal-p').classList.add('open');}
+
 function atualizarPrev(){
   if(empIdx===null)return;
-  const e=itens[empIdx];const dias=document.getElementById('p-dias').value||30;const motivo=document.getElementById('p-motivo').value;
+  const e=itens[empIdx];
+  const dias=document.getElementById('p-dias').value||30;
+  const motivo=document.getElementById('p-motivo').value;
   const empLabel=[e.emp,e.oc].filter(Boolean).join(' / ');
   document.getElementById('p-prev').textContent=`Senhor(a) Gestor(a),\n\nVimos por meio deste solicitar prorrogação do prazo de entrega referente ao Empenho/OC nº ${empLabel||'[nº]'}, emitido em favor desta empresa pelo órgão ${e.razao||'[órgão]'}.\n\nObjeto: ${e.item||'[produto]'}\nQuantidade: ${e.qtd||'[qtd]'} unidade(s)\nValor total: R$ ${fmt(e.total)}\nPrazo original: ${fmtDt(e.venc)}\nNovo prazo solicitado: ${dias} dias a partir da aprovação\n\nO motivo da solicitação é a ${motivo}, situação que impossibilita o cumprimento do prazo original.\n\nAtenciosamente,\n${new Date().toLocaleDateString('pt-BR')}`;
 }
+
 function copiarPrev(){navigator.clipboard.writeText(document.getElementById('p-prev').textContent).then(()=>toast('Texto copiado!')).catch(()=>alert('Copie manualmente.'));}
 
-async function lerPDFEmp(input){
-  const file=input.files[0];if(!file)return;
-  const msg=document.getElementById('ai-emp-msg');
-  document.getElementById('ai-spinner').style.display='';
-  document.getElementById('ai-icon').style.display='none';
-  msg.textContent='Lendo PDF com IA...';
-  try{
-    const b64=await toBase64(file);
-    const prompt=`Analise este empenho/ordem de compra público brasileiro e retorne JSON com EXATAMENTE estas chaves: emp (número do empenho), oc (número da ordem de compra), razao (razão social do órgão), cnpj, modalidade, licitacao (número da licitação se houver, senão null), contrato (número do contrato se houver, senão null), emissao (data YYYY-MM-DD), localDepto (departamento/setor de entrega), localPredio (nome do prédio/local), localEnd (endereço completo de entrega), prazo (prazo de entrega em dias como número se informado explicitamente, senão null), obs, itens (array de objetos com: item, sku, qtd, unit, total). Retorne APENAS JSON válido, sem markdown.`;
-    const p=await chamarClaude(b64,prompt);
-    if(p.emp)document.getElementById('fe-emp').value=p.emp;
-    if(p.oc)document.getElementById('fe-oc').value=p.oc;
-    if(p.razao)document.getElementById('fe-razao').value=p.razao;
-    if(p.cnpj)document.getElementById('fe-cnpj').value=p.cnpj;
-    if(p.modalidade)document.getElementById('fe-modalidade').value=p.modalidade;
-    if(p.licitacao)document.getElementById('fe-licitacao').value=p.licitacao;
-    if(p.contrato)document.getElementById('fe-contrato').value=p.contrato;
-    if(p.emissao)document.getElementById('fe-emissao').value=p.emissao;
-    if(p.localDepto)document.getElementById('fe-local-depto').value=p.localDepto;
-    if(p.localPredio)document.getElementById('fe-local-predio').value=p.localPredio;
-    if(p.localEnd)document.getElementById('fe-local-end').value=p.localEnd;
-    if(p.obs)document.getElementById('fe-obs').value=p.obs;
-    if(p.prazo){document.getElementById('fe-prazo').value=p.prazo;calcularVencimento();}
-    document.getElementById('itens-container').innerHTML='';itemCount=0;
-    if(p.itens&&p.itens.length)p.itens.forEach(it=>addItemRow(it));else addItemRow();
-    document.getElementById('ai-spinner').style.display='none';
-    document.getElementById('ai-icon').style.display='';
-    msg.textContent='✓ Dados extraídos! Informe o prazo em dias e confira antes de salvar.';
-  }catch(e){
-    document.getElementById('ai-spinner').style.display='none';
-    document.getElementById('ai-icon').style.display='';
-    msg.textContent='Erro: '+e.message+'. Preencha manualmente.';
-  }
+// Vincular empenho a registro flag
+function vincularEmpenho(idx){
+  const e=itens[idx];
+  // preencher form de novo empenho com dados da NF e ir para aba
+  showTab('novo',document.querySelectorAll('.tab')[1]);
+  document.getElementById('fe-oc').value=e.oc||'';
+  document.getElementById('fe-emp').value=e.emp||'';
+  document.getElementById('fe-razao').value=e.razao||'';
+  document.getElementById('fe-cnpj').value=e.cnpj||'';
+  document.getElementById('ai-emp-msg').textContent='Dados pré-preenchidos da NF. Faça upload do empenho ou complete as informações e salve.';
+  toast('Complete os dados do empenho e salve.');
 }
 
+// LEITURA DE NF
 async function processarNFs(input){
   const files=Array.from(input.files);if(!files.length)return;
   const container=document.getElementById('nf-resultados');
-  container.innerHTML=`<div class="ai-box"><span class="spinner"></span> Processando ${files.length} NF(s)...</div>`;
+  container.innerHTML=`<div class="ai-box"><span class="spinner"></span> Processando ${files.length} NF(s) com IA...</div>`;
   nfPendentes=[];
+
   for(const file of files){
     try{
       const b64=await toBase64(file);
-      const prompt=`Analise esta nota fiscal brasileira e retorne JSON com: num_nf, data_emissao (YYYY-MM-DD), valor_total (número), num_empenho (número do empenho referenciado se houver), num_oc (número da OC referenciada se houver), cnpj_tomador, razao_tomador. Retorne APENAS JSON válido, sem markdown.`;
+      const prompt=`Você é um especialista em notas fiscais brasileiras. Analise esta NF e extraia os dados em JSON com EXATAMENTE estas chaves:
+
+num_nf: número da nota fiscal,
+serie: série da NF,
+data_emissao: data de emissão no formato YYYY-MM-DD,
+valor_total: valor total da nota como número,
+
+destinatario_razao: razão social do destinatário,
+destinatario_cnpj: CNPJ do destinatário,
+destinatario_endereco: endereço completo do destinatário,
+destinatario_municipio: município do destinatário,
+destinatario_uf: UF do destinatário,
+
+inf_complementares_oc: número da Ordem de Compra extraído do campo Informações Complementares (procure por "OC", "O.C.", "Ordem de Compra" seguido de número/ano),
+inf_complementares_empenho: número do empenho extraído das Informações Complementares (procure por "Empenho", "NE" seguido de número),
+inf_complementares_contrato: número do contrato extraído das Informações Complementares,
+inf_complementares_local_entrega: local de entrega extraído das Informações Complementares,
+
+itens: array de objetos com: descricao, sku (código do produto), qtd (número), valor_unit (número), valor_total (número).
+
+Retorne APENAS JSON válido, sem markdown, sem texto adicional.`;
+
       const p=await chamarClaude(b64,prompt);
-      const match=itens.find(e=>(p.num_empenho&&(e.emp||'').replace(/\D/g,'').includes((p.num_empenho||'').replace(/\D/g,'')))||(p.num_oc&&(e.oc||'').replace(/\D/g,'').includes((p.num_oc||'').replace(/\D/g,''))));
+
+      // tentar vincular por OC, empenho ou CNPJ
+      const ocNF=(p.inf_complementares_oc||'').replace(/\D/g,'');
+      const empNF=(p.inf_complementares_empenho||'').replace(/\D/g,'');
+      const cnpjNF=(p.destinatario_cnpj||'').replace(/\D/g,'');
+
+      const match=itens.find(e=>{
+        const ocE=(e.oc||'').replace(/\D/g,'');
+        const empE=(e.emp||'').replace(/\D/g,'');
+        const cnpjE=(e.cnpj||'').replace(/\D/g,'');
+        if(ocNF&&ocE&&ocE.includes(ocNF))return true;
+        if(ocNF&&ocE&&ocNF.includes(ocE))return true;
+        if(empNF&&empE&&empE.includes(empNF))return true;
+        if(cnpjNF&&cnpjE&&cnpjE===cnpjNF)return true;
+        return false;
+      });
+
       nfPendentes.push({file:file.name,dados:p,match:match?itens.indexOf(match):null});
-    }catch(e){nfPendentes.push({file:file.name,erro:e.message,match:null});}
+    }catch(e){
+      nfPendentes.push({file:file.name,erro:e.message,match:null});
+    }
   }
   renderNFResultados();
 }
 
 function renderNFResultados(){
   const container=document.getElementById('nf-resultados');container.innerHTML='';
+
   nfPendentes.forEach((nf,i)=>{
     const div=document.createElement('div');
     div.className='nf-result '+(nf.match!==null?'match':'no-match');
+
     if(nf.erro){
-      div.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b>${nf.file}</b> <span class="badge b-danger">Erro ao ler</span></div><div style="font-size:12px;color:#c62828">${nf.erro}</div>`;
+      div.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><i class="ti ti-file-x" style="color:#c62828"></i><b>${nf.file}</b><span class="badge b-danger">Erro ao processar</span></div><div style="font-size:12px;color:#c62828">${nf.erro}</div>`;
     }else{
       const p=nf.dados;
-      div.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><i class="ti ti-file-check" style="color:${nf.match!==null?'#2e7d32':'#e65100'}"></i><b>${nf.file}</b><span class="badge ${nf.match!==null?'b-ok':'b-pend'}">${nf.match!==null?'Vinculado automaticamente':'Não encontrado — novo registro'}</span></div>
-      <div class="form-grid" style="gap:8px">
-        <div class="form-group"><label>NF nº</label><input value="${p.num_nf||''}" id="nf-num-${i}"></div>
-        <div class="form-group"><label>Data emissão</label><input type="date" value="${p.data_emissao||''}" id="nf-dt-${i}"></div>
-        <div class="form-group"><label>Valor R$</label><input type="number" value="${p.valor_total||''}" id="nf-val-${i}"></div>
-        <div class="form-group"><label>Vincular ao item</label>
-          <select id="nf-sel-${i}">
-            <option value="">— Criar novo registro pendente —</option>
-            ${itens.map((e,idx)=>`<option value="${idx}"${nf.match===idx?' selected':''}>${[e.emp,e.oc].filter(Boolean).join('/')||'—'} | ${(e.razao||'').substring(0,20)} | ${(e.item||'').substring(0,25)}</option>`).join('')}
-          </select>
+      const matchItem=nf.match!==null?itens[nf.match]:null;
+      const empLabel=matchItem?[matchItem.emp,matchItem.oc].filter(Boolean).join(' / '):'—';
+      div.innerHTML=`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <i class="ti ti-file-check" style="color:${nf.match!==null?'#2e7d32':'#c62828'}"></i>
+          <b>${nf.file}</b>
+          <span class="badge ${nf.match!==null?'b-ok':'b-flag'}">${nf.match!==null?'✅ Vinculado — '+empLabel:'🚩 Empenho não cadastrado'}</span>
         </div>
-        <div class="form-group"><label>Faturamento parcial?</label>
-          <select id="nf-parcial-${i}"><option value="">Não — total</option><option value="1">Sim — parcial</option></select>
+        ${nf.match===null?`<div class="flag-box"><i class="ti ti-alert-triangle"></i> OC <b>${p.inf_complementares_oc||'não identificada'}</b> não encontrada no painel. Este registro será criado com flag de pendência.</div>`:''}
+        <div class="form-grid-3" style="gap:8px;margin-bottom:10px">
+          <div class="form-group"><label>NF nº</label><input value="${p.num_nf||''}" id="nf-num-${i}"></div>
+          <div class="form-group"><label>Série</label><input value="${p.serie||''}" id="nf-serie-${i}" style="width:80px"></div>
+          <div class="form-group"><label>Data emissão</label><input type="date" value="${p.data_emissao||''}" id="nf-dt-${i}"></div>
+          <div class="form-group"><label>Valor total R$</label><input type="number" value="${p.valor_total||''}" id="nf-val-${i}"></div>
+          <div class="form-group"><label>OC (inf. complementares)</label><input value="${p.inf_complementares_oc||''}" id="nf-oc-${i}" readonly style="background:#f5f5f3"></div>
+          <div class="form-group"><label>Local de entrega (inf. comp.)</label><input value="${p.inf_complementares_local_entrega||''}" id="nf-local-${i}" readonly style="background:#f5f5f3"></div>
         </div>
-        <div class="form-group"><label>Observações</label><input id="nf-obs-${i}" value="${p.razao_tomador||''}"></div>
-      </div>`;
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:6px">Destinatário</div>
+        <div class="form-grid" style="gap:8px;margin-bottom:10px">
+          <div class="form-group"><label>Razão social</label><input value="${p.destinatario_razao||''}" id="nf-dest-razao-${i}" readonly style="background:#f5f5f3"></div>
+          <div class="form-group"><label>CNPJ</label><input value="${p.destinatario_cnpj||''}" id="nf-dest-cnpj-${i}" readonly style="background:#f5f5f3"></div>
+          <div class="form-group full"><label>Endereço / Município</label><input value="${(p.destinatario_endereco||'')+' — '+(p.destinatario_municipio||'')+' '+( p.destinatario_uf||'')}" readonly style="background:#f5f5f3"></div>
+        </div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:6px">Itens da NF (${(p.itens||[]).length})</div>
+        <div style="background:#f5f5f3;border-radius:6px;padding:8px;font-size:12px;margin-bottom:10px">
+          ${(p.itens||[]).map(it=>`<div style="padding:4px 0;border-bottom:1px solid #ebebeb">${it.descricao||''} — SKU: ${it.sku||'-'} — Qtd: ${it.qtd||'-'} — Unit: R$ ${fmt(it.valor_unit)} — Total: R$ ${fmt(it.valor_total)}</div>`).join('')||'<span style="color:#bbb">Nenhum item extraído</span>'}
+        </div>
+        <div class="form-grid" style="gap:8px">
+          <div class="form-group"><label>Vincular ao item do painel</label>
+            <select id="nf-sel-${i}">
+              <option value="">${nf.match===null?'— Criar registro com flag 🚩 —':'— Selecione —'}</option>
+              ${itens.map((e,idx)=>`<option value="${idx}"${nf.match===idx?' selected':''}>${[e.emp,e.oc].filter(Boolean).join('/')||'—'} | ${(e.razao||'').substring(0,20)} | ${(e.item||'').substring(0,25)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Faturamento parcial?</label>
+            <select id="nf-parcial-${i}"><option value="">Não — faturamento total</option><option value="1">Sim — faturamento parcial</option></select>
+          </div>
+        </div>`;
     }
     container.appendChild(div);
   });
+
   document.getElementById('btn-confirmar-nf').style.display=nfPendentes.length?'':'none';
 }
 
 async function confirmarNFs(){
   for(let i=0;i<nfPendentes.length;i++){
     const nf=nfPendentes[i];if(nf.erro)continue;
+    const p=nf.dados;
     const selVal=document.getElementById(`nf-sel-${i}`)?.value;
     const selIdx=selVal!==''?parseInt(selVal):NaN;
     const nfNum=document.getElementById(`nf-num-${i}`)?.value||'';
     const nfDt=document.getElementById(`nf-dt-${i}`)?.value||'';
     const nfVal=document.getElementById(`nf-val-${i}`)?.value||'';
-    const nfObs=document.getElementById(`nf-obs-${i}`)?.value||'';
     const parcial=document.getElementById(`nf-parcial-${i}`)?.value||'';
+
     if(!isNaN(selIdx)&&itens[selIdx]){
       const e=itens[selIdx];
       await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:22,val:nfNum})});
       await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:23,val:nfDt})});
       await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:24,val:nfVal})});
-      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:25,val:nfObs})});
       await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:26,val:parcial})});
     }else{
-      const row=[Date.now().toString()+Math.random().toString(36).substr(2,5),'','','','','Tanabe','','','','','','','',`NF ${nfNum} — pendente vinculação`,'','1','',nfVal,'','',nfDt,`NF sem empenho correspondente`,nfNum,nfDt,nfVal,nfObs,parcial];
-      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'save',row})});
+      // criar registro com flag de empenho não cadastrado
+      const itensList=p.itens&&p.itens.length?p.itens:[{descricao:'',sku:'',qtd:1,valor_unit:0,valor_total:p.valor_total||0}];
+      for(const it of itensList){
+        const row=[
+          Date.now().toString()+Math.random().toString(36).substr(2,5),
+          p.inf_complementares_empenho||'',
+          p.inf_complementares_oc||'',
+          p.destinatario_razao||'',
+          p.destinatario_cnpj||'',
+          'Tanabe','','',
+          p.inf_complementares_contrato||'',
+          p.data_emissao||'',
+          p.inf_complementares_local_entrega||'','',
+          p.destinatario_endereco||'',
+          it.descricao||'',it.sku||'',
+          it.qtd||1,it.valor_unit||0,it.valor_total||0,
+          '','','','NF lançada sem empenho cadastrado',
+          nfNum,nfDt,nfVal,'',parcial,'1'
+        ];
+        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'save',row})});
+      }
     }
   }
-  toast('NFs registradas com sucesso!');
+  toast('NFs registradas!');
   document.getElementById('nf-resultados').innerHTML='';
   document.getElementById('btn-confirmar-nf').style.display='none';
   document.getElementById('f-pdf-nf').value='';
@@ -500,7 +624,14 @@ async function confirmarNFs(){
 }
 
 async function chamarClaude(b64,prompt){
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':AK,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:2000,messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]}]})});
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':AK,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:2000,messages:[{role:'user',content:[
+      {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+      {type:'text',text:prompt}
+    ]}]})
+  });
   if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'API erro '+resp.status);}
   const data=await resp.json();
   if(!data.content)throw new Error('Resposta inválida da API');
