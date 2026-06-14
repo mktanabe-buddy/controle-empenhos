@@ -575,47 +575,70 @@ function renderNFResultados(){
 }
 
 async function confirmarNFs(){
+  let salvos=0;let erros=[];
   for(let i=0;i<nfPendentes.length;i++){
     const nf=nfPendentes[i];if(nf.erro)continue;
     const p=nf.dados;
     const selVal=document.getElementById(`nf-sel-${i}`)?.value;
-    const selIdx=selVal!==''?parseInt(selVal):NaN;
+    const selIdx=(selVal&&selVal!=='')?parseInt(selVal):NaN;
     const nfNum=document.getElementById(`nf-num-${i}`)?.value||'';
     const nfDt=document.getElementById(`nf-dt-${i}`)?.value||'';
     const nfVal=document.getElementById(`nf-val-${i}`)?.value||'';
     const parcial=document.getElementById(`nf-parcial-${i}`)?.value||'';
 
-    if(!isNaN(selIdx)&&itens[selIdx]){
-      const e=itens[selIdx];
-      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:22,val:nfNum})});
-      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:23,val:nfDt})});
-      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:24,val:nfVal})});
-      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'update',id:e.id,col:26,val:parcial})});
-    }else{
-      // criar registro com flag de empenho não cadastrado
-      const itensList=p.itens&&p.itens.length?p.itens:[{descricao:'',sku:'',qtd:1,valor_unit:0,valor_total:p.valor_total||0}];
-      for(const it of itensList){
-        const row=[
-          Date.now().toString()+Math.random().toString(36).substr(2,5),
-          p.inf_complementares_empenho||'',
-          p.inf_complementares_oc||'',
-          p.destinatario_razao||'',
-          p.destinatario_cnpj||'',
-          'Tanabe','','',
-          p.inf_complementares_contrato||'',
-          p.data_emissao||'',
-          p.inf_complementares_local_entrega||'','',
-          p.destinatario_endereco||'',
-          it.descricao||'',it.sku||'',
-          it.qtd||1,it.valor_unit||0,it.valor_total||0,
-          '','','','NF lançada sem empenho cadastrado',
-          nfNum,nfDt,nfVal,'',parcial,'1'
+    try{
+      if(!isNaN(selIdx)&&itens[selIdx]){
+        // vincular a item existente
+        const e=itens[selIdx];
+        const updates=[
+          {id:e.id,col:22,val:nfNum},
+          {id:e.id,col:23,val:nfDt},
+          {id:e.id,col:24,val:nfVal},
+          {id:e.id,col:26,val:parcial}
         ];
-        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'save',row})});
+        const r=await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'updateMany',updates})});
+        const d=await r.json();
+        if(d.ok)salvos++;else erros.push('Erro ao vincular NF '+nfNum);
+      }else{
+        // criar novo registro com flag
+        const itensList=(p.itens&&p.itens.length)?p.itens:[{descricao:'Item da NF '+nfNum,sku:'',qtd:1,valor_unit:parseFloat(nfVal)||0,valor_total:parseFloat(nfVal)||0}];
+        for(const it of itensList){
+          const uid=Date.now().toString()+Math.random().toString(36).substr(2,5);
+          const row=[
+            uid,
+            p.inf_complementares_empenho||'',
+            p.inf_complementares_oc||'',
+            p.destinatario_razao||'',
+            p.destinatario_cnpj||'',
+            'Tanabe',
+            '','',
+            p.inf_complementares_contrato||'',
+            p.data_emissao||'',
+            p.inf_complementares_local_entrega||'',
+            '',
+            p.destinatario_endereco||'',
+            it.descricao||('Item NF '+nfNum),
+            it.sku||'',
+            Number(it.qtd)||1,
+            Number(it.valor_unit)||0,
+            Number(it.valor_total)||parseFloat(nfVal)||0,
+            '','','',
+            'NF lançada sem empenho cadastrado no painel',
+            nfNum,nfDt,
+            Number(nfVal)||0,
+            '',parcial,'1'
+          ];
+          const r=await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'save',row})});
+          const d=await r.json();
+          if(d.ok)salvos++;else erros.push('Erro ao salvar item da NF '+nfNum);
+        }
       }
-    }
+    }catch(e){erros.push('Erro NF '+i+': '+e.message);}
   }
-  toast('NFs registradas!');
+
+  if(erros.length){alert('Erros:\n'+erros.join('\n'));}
+  else{toast(salvos+' registro(s) salvo(s) com sucesso!');}
+
   document.getElementById('nf-resultados').innerHTML='';
   document.getElementById('btn-confirmar-nf').style.display='none';
   document.getElementById('f-pdf-nf').value='';
