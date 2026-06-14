@@ -726,9 +726,7 @@ async function confirmarNFs(){
     }catch(err){erros.push('Erro NF '+i+': '+err.message);}
   }
 
-  if(erros.length){alert('Erros:
-'+erros.join('
-'));}
+  if(erros.length){alert('Erros: '+erros.join(' | '));}
   else{toast(salvos+' registro(s) salvo(s) com sucesso!');}
 
   document.getElementById('nf-resultados').innerHTML='';
