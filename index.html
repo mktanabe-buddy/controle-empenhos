@@ -578,62 +578,81 @@ async function processarNFs(input){
 function renderNFResultados(){
   const container=document.getElementById('nf-resultados');container.innerHTML='';
 
-  nfPendentes.forEach((nf,i)=>{
+  nfPendentes.forEach(function(nf,i){
     const div=document.createElement('div');
     div.className='nf-result '+(nf.match!==null?'match':'no-match');
 
     if(nf.erro){
-      div.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><i class="ti ti-file-x" style="color:#c62828"></i><b>${nf.file}</b><span class="badge b-danger">Erro ao processar</span></div><div style="font-size:12px;color:#c62828">${nf.erro}</div>`;
+      div.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b>'+nf.file+'</b><span class="badge b-danger">Erro ao processar</span></div><div style="font-size:12px;color:#c62828">'+nf.erro+'</div>';
     }else{
       const p=nf.dados;
       const matchItem=nf.match!==null?itens[nf.match]:null;
       const empLabel=matchItem?[matchItem.emp,matchItem.oc].filter(Boolean).join(' / '):'—';
-      div.innerHTML=`
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <i class="ti ti-file-check" style="color:${nf.match!==null?'#2e7d32':'#c62828'}"></i>
-          <b>${nf.file}</b>
-          <span class="badge ${nf.match!==null?'b-ok':'b-flag'}">${nf.match!==null?'✅ Vinculado — '+empLabel:'🚩 Empenho não cadastrado'}</span>
-        </div>
-        ${nf.match===null?`<div class="flag-box"><i class="ti ti-alert-triangle"></i> OC <b>${p.inf_complementares_oc||'não identificada'}</b> não encontrada no painel. Este registro será criado com flag de pendência.</div>`:''}
-        <div class="form-grid-3" style="gap:8px;margin-bottom:10px">
-          <div class="form-group"><label>NF nº</label><input value="${p.num_nf||''}" id="nf-num-${i}"></div>
-          <div class="form-group"><label>Data emissão</label><input type="date" value="${p.data_emissao||''}" id="nf-dt-${i}"></div>
-          <div class="form-group"><label>Valor total R$</label><input type="number" value="${p.valor_total||''}" id="nf-val-${i}"></div>
-          <div class="form-group"><label>OC (inf. complementares)</label><input value="${p.inf_complementares_oc||''}" id="nf-oc-${i}" readonly style="background:#f5f5f3"></div>
-          <div class="form-group"><label>Local de entrega (inf. comp.)</label><input value="${p.inf_complementares_local_entrega||''}" id="nf-local-${i}" readonly style="background:#f5f5f3"></div>
-        </div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:6px">Destinatário</div>
-        <div class="form-grid" style="gap:8px;margin-bottom:10px">
-          <div class="form-group"><label>Razão social</label><input value="${p.destinatario_razao||''}" id="nf-dest-razao-${i}" readonly style="background:#f5f5f3"></div>
-          <div class="form-group"><label>CNPJ</label><input value="${p.destinatario_cnpj||''}" id="nf-dest-cnpj-${i}" readonly style="background:#f5f5f3"></div>
-          <div class="form-group full"><label>Endereço / Município</label><input value="${(p.destinatario_endereco||'')+' — '+(p.destinatario_municipio||'')+' '+( p.destinatario_uf||'')}" readonly style="background:#f5f5f3"></div>
-        </div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:6px">Itens da NF (${(p.itens||[]).length})</div>
-        <div style="background:#f5f5f3;border-radius:6px;padding:8px;font-size:12px;margin-bottom:10px">
-          ${(p.itens||[]).map(it=>`<div style="padding:4px 0;border-bottom:1px solid #ebebeb">${it.descricao||''} — SKU: ${it.sku||'-'} — Qtd: ${it.qtd||'-'} — Unit: R$ ${fmt(it.valor_unit)} — Total: R$ ${fmt(it.valor_total)}</div>`).join('')||'<span style="color:#bbb">Nenhum item extraído</span>'}
-        </div>
-        <div class="form-grid" style="gap:8px">
-          <div class="form-group"><label>Responsável</label>
-            <select id="nf-owner-${i}">
-              <option>Tanabe</option><option>rosi</option><option>Henrique</option><option>nilton</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Vincular ao item do painel</label>
-            <select id="nf-sel-${i}">
-              <option value="">${nf.match===null?'— Criar registro com flag 🚩 —':'— Selecione —'}</option>
-              ${itens.map((e,idx)=>`<option value="${idx}"${nf.match===idx?' selected':''}>${[e.emp,e.oc].filter(Boolean).join('/')||'—'} | ${String(e.razao||'').substring(0,20)} | ${String(e.item||'').substring(0,25)}</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group"><label>Faturamento parcial?</label>
-            <select id="nf-parcial-${i}"><option value="">Não — faturamento total</option><option value="1">Sim — faturamento parcial</option></select>
-          </div>
-        </div>`;
+      const statusBadge=nf.match!==null
+        ?'<span class="badge b-ok">&#10003; Vinculado — '+empLabel+'</span>'
+        :'<span class="badge b-flag">&#128681; Empenho não cadastrado</span>';
+      const flagBox=nf.match===null
+        ?'<div class="flag-box"><i class="ti ti-alert-triangle"></i> OC <b>'+(p.inf_complementares_oc||'não identificada')+'</b> não encontrada no painel. Registro será criado com flag de pendência.</div>'
+        :'';
+
+      const itensList=(p.itens||[]).map(function(it){
+        return '<div style="padding:4px 0;border-bottom:1px solid #ebebeb">'+
+          (it.descricao||'')+' — SKU: '+(it.sku||'-')+
+          ' — Qtd: '+(it.qtd||'-')+
+          ' — Unit: R$ '+fmt(it.valor_unit)+
+          ' — Total: R$ '+fmt(it.valor_total)+'</div>';
+      }).join('')||'<span style="color:#bbb">Nenhum item extraído</span>';
+
+      const opcoesItens=itens.map(function(e,idx){
+        const sel=nf.match===idx?' selected':'';
+        const lbl=[e.emp,e.oc].filter(Boolean).join('/')||'—';
+        return '<option value="'+idx+'"'+sel+'>'+lbl+' | '+String(e.razao||'').substring(0,20)+' | '+String(e.item||'').substring(0,25)+'</option>';
+      }).join('');
+
+      div.innerHTML=
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+          '<i class="ti ti-file-check" style="color:'+(nf.match!==null?'#2e7d32':'#c62828')+'"></i>'+
+          '<b>'+nf.file+'</b>'+statusBadge+
+        '</div>'+
+        flagBox+
+        '<div class="form-grid-3" style="gap:8px;margin-bottom:10px">'+
+          '<div class="form-group"><label>NF nº</label><input value="'+(p.num_nf||'')+'" id="nf-num-'+i+'"></div>'+
+          '<div class="form-group"><label>Data emissão</label><input type="date" value="'+(p.data_emissao||'')+'" id="nf-dt-'+i+'"></div>'+
+          '<div class="form-group"><label>Valor total R$</label><input type="number" value="'+(p.valor_total||'')+'" id="nf-val-'+i+'"></div>'+
+          '<div class="form-group"><label>OC (inf. complementares)</label><input value="'+(p.inf_complementares_oc||'')+'" id="nf-oc-'+i+'" readonly style="background:#f5f5f3"></div>'+
+          '<div class="form-group"><label>Local de entrega</label><input value="'+(p.inf_complementares_local_entrega||'')+'" id="nf-local-'+i+'" readonly style="background:#f5f5f3"></div>'+
+        '</div>'+
+        '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:6px">Destinatário</div>'+
+        '<div class="form-grid" style="gap:8px;margin-bottom:10px">'+
+          '<div class="form-group"><label>Razão social</label><input value="'+(p.destinatario_razao||'')+'" readonly style="background:#f5f5f3"></div>'+
+          '<div class="form-group"><label>CNPJ</label><input value="'+(p.destinatario_cnpj||'')+'" readonly style="background:#f5f5f3"></div>'+
+          '<div class="form-group full"><label>Endereço / Município</label><input value="'+(p.destinatario_endereco||'')+' — '+(p.destinatario_municipio||'')+' '+(p.destinatario_uf||'')+'" readonly style="background:#f5f5f3"></div>'+
+        '</div>'+
+        '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:6px">Itens da NF ('+(p.itens||[]).length+')</div>'+
+        '<div style="background:#f5f5f3;border-radius:6px;padding:8px;font-size:12px;margin-bottom:10px">'+itensList+'</div>'+
+        '<div class="form-grid" style="gap:8px">'+
+          '<div class="form-group"><label>Responsável</label>'+
+            '<select id="nf-owner-'+i+'">'+
+              '<option>Tanabe</option><option>rosi</option><option>Henrique</option><option>nilton</option>'+
+            '</select>'+
+          '</div>'+
+          '<div class="form-group"><label>Vincular ao item do painel</label>'+
+            '<select id="nf-sel-'+i+'">'+
+              '<option value="">'+(nf.match===null?'— Criar registro com flag —':'— Selecione —')+'</option>'+
+              opcoesItens+
+            '</select>'+
+          '</div>'+
+          '<div class="form-group"><label>Faturamento parcial?</label>'+
+            '<select id="nf-parcial-'+i+'"><option value="">Não — faturamento total</option><option value="1">Sim — faturamento parcial</option></select>'+
+          '</div>'+
+        '</div>';
     }
     container.appendChild(div);
   });
 
   document.getElementById('btn-confirmar-nf').style.display=nfPendentes.length?'':'none';
 }
+
 
 async function confirmarNFs(){
   let salvos=0;let erros=[];
