@@ -515,7 +515,12 @@ Retorne APENAS JSON válido, sem markdown, sem texto adicional.`;
       nfPendentes.push({file:file.name,erro:e.message,match:null});
     }
   }
+  console.log("nfPendentes após loop:", JSON.stringify(nfPendentes));
+  if(!nfPendentes.length){
+    document.getElementById("nf-resultados").innerHTML='<div style="color:#c62828;padding:12px">Nenhuma NF foi processada. Verifique o arquivo.</div>';
+  }
   renderNFResultados();
+  document.getElementById("btn-confirmar-nf").style.display="";
 }
 
 function renderNFResultados(){
