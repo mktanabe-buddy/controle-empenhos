@@ -462,39 +462,23 @@ function vincularEmpenho(idx){
 
 // LEITURA DE NF
 async function processarNFs(input){
-  const files=Array.from(input.files);if(!files.length)return;
-  const container=document.getElementById('nf-resultados');
-  container.innerHTML=`<div class="ai-box"><span class="spinner"></span> Processando ${files.length} NF(s) com IA...</div>`;
+  const files=Array.from(input.files);
+  if(!files.length)return;
+  
   nfPendentes=[];
+  const container=document.getElementById('nf-resultados');
+  container.innerHTML='<div class="ai-box"><span class="spinner"></span> Processando '+files.length+' NF(s) com IA...</div>';
+  document.getElementById('btn-confirmar-nf').style.display='none';
 
-  for(const file of files){
+  for(let fi=0;fi<files.length;fi++){
+    const file=files[fi];
+    container.innerHTML='<div class="ai-box"><span class="spinner"></span> Lendo '+file.name+' ('+( fi+1)+'/'+files.length+')...</div>';
     try{
       const b64=await toBase64(file);
-      const prompt=`Você é um especialista em notas fiscais brasileiras. Analise esta NF e extraia os dados em JSON com EXATAMENTE estas chaves:
-
-num_nf: número da nota fiscal,
-serie: série da NF,
-data_emissao: data de emissão no formato YYYY-MM-DD,
-valor_total: valor total da nota como número,
-
-destinatario_razao: razão social do destinatário,
-destinatario_cnpj: CNPJ do destinatário,
-destinatario_endereco: endereço completo do destinatário,
-destinatario_municipio: município do destinatário,
-destinatario_uf: UF do destinatário,
-
-inf_complementares_oc: número da Ordem de Compra extraído do campo Informações Complementares (procure por "OC", "O.C.", "Ordem de Compra" seguido de número/ano),
-inf_complementares_empenho: número do empenho extraído das Informações Complementares (procure por "Empenho", "NE" seguido de número),
-inf_complementares_contrato: número do contrato extraído das Informações Complementares,
-inf_complementares_local_entrega: local de entrega extraído das Informações Complementares,
-
-itens: array de objetos com: descricao, sku (código do produto), qtd (número), valor_unit (número), valor_total (número).
-
-Retorne APENAS JSON válido, sem markdown, sem texto adicional.`;
-
+      const prompt='Analise esta nota fiscal brasileira e retorne JSON com estas chaves exatas: num_nf, serie, data_emissao (YYYY-MM-DD), valor_total (numero), destinatario_razao, destinatario_cnpj, destinatario_endereco, destinatario_municipio, destinatario_uf, inf_complementares_oc (numero da OC nas informacoes complementares, ex: se tiver "OC 3120/2026" retorne "3120/2026"), inf_complementares_empenho (numero do empenho nas inf complementares), inf_complementares_contrato, inf_complementares_local_entrega (local apos LOCAL DE ENTREGA nas inf complementares), itens (array com: descricao, sku, qtd, valor_unit, valor_total). Retorne APENAS JSON valido sem markdown.';
+      
       const p=await chamarClaude(b64,prompt);
-
-      // tentar vincular por OC, empenho ou CNPJ
+      
       const ocNF=(p.inf_complementares_oc||'').replace(/\D/g,'');
       const empNF=(p.inf_complementares_empenho||'').replace(/\D/g,'');
       const cnpjNF=(p.destinatario_cnpj||'').replace(/\D/g,'');
@@ -503,26 +487,21 @@ Retorne APENAS JSON válido, sem markdown, sem texto adicional.`;
         const ocE=(e.oc||'').replace(/\D/g,'');
         const empE=(e.emp||'').replace(/\D/g,'');
         const cnpjE=(e.cnpj||'').replace(/\D/g,'');
-        if(ocNF&&ocE&&ocE.includes(ocNF))return true;
-        if(ocNF&&ocE&&ocNF.includes(ocE))return true;
-        if(empNF&&empE&&empE.includes(empNF))return true;
+        if(ocNF&&ocE&&(ocE.includes(ocNF)||ocNF.includes(ocE)))return true;
+        if(empNF&&empE&&(empE.includes(empNF)||empNF.includes(empE)))return true;
         if(cnpjNF&&cnpjE&&cnpjE===cnpjNF)return true;
         return false;
       });
 
-      nfPendentes.push({file:file.name,dados:p,match:match?itens.indexOf(match):null});
-    }catch(e){
-      nfPendentes.push({file:file.name,erro:e.message,match:null});
+      nfPendentes.push({file:file.name,dados:p,match:match?itens.indexOf(match):null,erro:null});
+    }catch(err){
+      nfPendentes.push({file:file.name,dados:null,match:null,erro:err.message});
     }
   }
-  console.log("nfPendentes após loop:", JSON.stringify(nfPendentes));
-  if(!nfPendentes.length){
-    document.getElementById("nf-resultados").innerHTML='<div style="color:#c62828;padding:12px">Nenhuma NF foi processada. Verifique o arquivo.</div>';
-  }
-  renderNFResultados();
-  document.getElementById("btn-confirmar-nf").style.display="";
-}
 
+  renderNFResultados();
+  document.getElementById('btn-confirmar-nf').style.display=nfPendentes.length?'':'none';
+}
 function renderNFResultados(){
   const container=document.getElementById('nf-resultados');container.innerHTML='';
 
