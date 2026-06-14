@@ -464,6 +464,41 @@ function vincularEmpenho(idx){
 }
 
 // LEITURA DE NF
+async function lerPDFEmp(input){
+  const file=input.files[0];if(!file)return;
+  const msg=document.getElementById('ai-emp-msg');
+  document.getElementById('ai-spinner').style.display='';
+  document.getElementById('ai-icon').style.display='none';
+  msg.textContent='Lendo PDF com IA...';
+  try{
+    const b64=await toBase64(file);
+    const prompt='Analise este empenho/ordem de compra público brasileiro e retorne JSON com EXATAMENTE estas chaves: emp (número do empenho), oc (número da ordem de compra), razao (razão social do órgão), cnpj, modalidade, licitacao (número da licitação se houver, senão null), contrato (número do contrato se houver, senão null), emissao (data YYYY-MM-DD), localDepto (departamento/setor de entrega), localPredio (nome do prédio/local), localEnd (endereço completo de entrega), prazo (prazo de entrega em dias como número se informado explicitamente, senão null), obs, itens (array de objetos com: item, sku, qtd, unit, total). Retorne APENAS JSON válido, sem markdown.';
+    const p=await chamarClaude(b64,prompt);
+    if(p.emp)document.getElementById('fe-emp').value=p.emp;
+    if(p.oc)document.getElementById('fe-oc').value=p.oc;
+    if(p.razao)document.getElementById('fe-razao').value=p.razao;
+    if(p.cnpj)document.getElementById('fe-cnpj').value=p.cnpj;
+    if(p.modalidade)document.getElementById('fe-modalidade').value=p.modalidade;
+    if(p.licitacao)document.getElementById('fe-licitacao').value=p.licitacao;
+    if(p.contrato)document.getElementById('fe-contrato').value=p.contrato;
+    if(p.emissao)document.getElementById('fe-emissao').value=p.emissao;
+    if(p.localDepto)document.getElementById('fe-local-depto').value=p.localDepto;
+    if(p.localPredio)document.getElementById('fe-local-predio').value=p.localPredio;
+    if(p.localEnd)document.getElementById('fe-local-end').value=p.localEnd;
+    if(p.obs)document.getElementById('fe-obs').value=p.obs;
+    if(p.prazo){document.getElementById('fe-prazo').value=p.prazo;calcularVencimento();}
+    document.getElementById('itens-container').innerHTML='';itemCount=0;
+    if(p.itens&&p.itens.length)p.itens.forEach(it=>addItemRow(it));else addItemRow();
+    document.getElementById('ai-spinner').style.display='none';
+    document.getElementById('ai-icon').style.display='';
+    msg.textContent='✓ Dados extraídos! Informe o prazo em dias e confira antes de salvar.';
+  }catch(e){
+    document.getElementById('ai-spinner').style.display='none';
+    document.getElementById('ai-icon').style.display='';
+    msg.textContent='Erro: '+e.message+'. Preencha manualmente.';
+  }
+}
+
 async function processarNFs(input){
   const files=Array.from(input.files);
   if(!files.length)return;
