@@ -575,6 +575,9 @@ function renderNFResultados(){
 }
 
 async function confirmarNFs(){
+  if(!nfPendentes.length){alert("ERRO: nfPendentes está vazio. Processe as NFs primeiro.");return;}
+  const resumo=nfPendentes.map((n,i)=>`NF ${i}: ${n.file} | match=${n.match} | erro=${n.erro||"none"}`).join("\n");
+  if(!confirm("Confirmar salvar?\n\n"+resumo))return;
   let salvos=0;let erros=[];
   for(let i=0;i<nfPendentes.length;i++){
     const nf=nfPendentes[i];if(nf.erro)continue;
