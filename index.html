@@ -264,6 +264,19 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
   </div>
 </div>
 
+
+<!-- MODAL DETALHE/EDIÇÃO -->
+<div class="overlay" id="modal-det">
+  <div class="modal" style="width:700px;max-width:96vw">
+    <h3><i class="ti ti-edit" style="color:#1a56db"></i> Detalhes e edição do registro</h3>
+    <div id="det-content"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="document.getElementById('modal-det').classList.remove('open')">Fechar</button>
+      <button class="btn btn-primary" onclick="salvarEdicao()"><i class="ti ti-device-floppy"></i> Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -401,6 +414,7 @@ function renderTabela(){
       var empLabel=([e.emp,e.oc].filter(function(x){return x&&x!=='-';}).join(' / '))||'-';
       var rowBg=s==='flag'?' style="background:#fff8f8"':'';
       var btnAcoes='';
+      btnAcoes+='<button class="btn btn-sm" data-action="det" data-idx="'+idx+'" title="Ver detalhes"><i class="ti ti-eye"></i></button> ';
       if(s!=='faturado'&&s!=='flag')btnAcoes+='<button class="btn btn-sm" data-action="prorr" data-idx="'+idx+'" title="Prorrogação"><i class="ti ti-clock-plus"></i></button> ';
       if(s==='flag')btnAcoes+='<button class="btn btn-sm" data-action="vinc" data-idx="'+idx+'" style="background:#fce4ec;color:#b71c1c;border-color:#ef9a9a"><i class="ti ti-link"></i> Vincular</button> ';
       btnAcoes+='<button class="btn btn-sm btn-danger" data-action="del" data-id="'+e.id+'"><i class="ti ti-trash"></i></button>';
@@ -442,7 +456,8 @@ function renderTabela(){
     var btn=ev.target.closest('[data-action]');
     if(!btn)return;
     var action=btn.getAttribute('data-action');
-    if(action==='prorr')abrirModal(parseInt(btn.getAttribute('data-idx')));
+    if(action==='det')abrirDetalhe(parseInt(btn.getAttribute('data-idx')));
+    else if(action==='prorr')abrirModal(parseInt(btn.getAttribute('data-idx')));
     else if(action==='vinc')vincularEmpenho(parseInt(btn.getAttribute('data-idx')));
     else if(action==='del')excluir(btn.getAttribute('data-id'));
   };
@@ -772,15 +787,22 @@ async function processarNFs(input){
         'num_nf (numero NF), data_emissao (YYYY-MM-DD), valor_total (numero), '+
         'destinatario_razao, destinatario_cnpj, destinatario_endereco, '+
         'destinatario_municipio, destinatario_uf, '+
-        'inf_complementares_oc (numero OC nas inf complementares, ex: se tiver "OC 3120/2026" retorne "3120/2026"), '+
-        'inf_complementares_empenho (numero empenho nas inf complementares), '+
-        'inf_complementares_contrato (numero contrato), '+
-        'inf_complementares_local_entrega (local apos LOCAL DE ENTREGA nas inf complementares), '+
+        'inf_ref (referencia principal do pedido extraida do campo Informacoes Complementares ou Dados Adicionais: '+
+        'procure nessa ordem: OC, Ordem de Compra, Empenho, NE, OF, Oficio, Chamado, ARP, Contrato. '+
+        'Retorne o primeiro identificador encontrado no formato "TIPO: NUMERO", ex: "OC: 3120/2026" ou "OF: 165" ou "Chamado: TI0321577". '+
+        'Se houver multiplos, separe por virgula), '+
+        'inf_complementares_oc (apenas o numero da OC se houver, senao null), '+
+        'inf_complementares_empenho (apenas o numero do empenho/NE se houver, senao null), '+
+        'inf_complementares_of (numero do OF ou Oficio se houver, senao null), '+
+        'inf_complementares_chamado (numero do chamado se houver, senao null), '+
+        'inf_complementares_contrato (numero contrato, senao null), '+
+        'inf_complementares_local_entrega (local apos LOCAL DE ENTREGA, senao null), '+
         'itens (array com: descricao, sku, qtd, valor_unit, valor_total). '+
         'APENAS JSON valido sem markdown.';
       var p=await chamarClaude(b64,prompt);
       var ocNF=String(p.inf_complementares_oc||'').replace(/\D/g,'');
       var empNF=String(p.inf_complementares_empenho||'').replace(/\D/g,'');
+      var ofNF=String(p.inf_complementares_of||'').replace(/\D/g,'');
       var cnpjNF=String(p.destinatario_cnpj||'').replace(/\D/g,'');
       var match=null;
       for(var j=0;j<itens.length;j++){
@@ -788,8 +810,10 @@ async function processarNFs(input){
         var ocE=String(e.oc||'').replace(/\D/g,'');
         var empE=String(e.emp||'').replace(/\D/g,'');
         var cnpjE=String(e.cnpj||'').replace(/\D/g,'');
-        if(ocNF&&ocE&&(ocE.indexOf(ocNF)>=0||ocNF.indexOf(ocE)>=0)){match=j;break;}
-        if(empNF&&empE&&(empE.indexOf(empNF)>=0||empNF.indexOf(empE)>=0)){match=j;break;}
+        if(ocNF&&ocE&&ocNF.length>2&&(ocE.indexOf(ocNF)>=0||ocNF.indexOf(ocE)>=0)){match=j;break;}
+        if(empNF&&empE&&empNF.length>2&&(empE.indexOf(empNF)>=0||empNF.indexOf(empE)>=0)){match=j;break;}
+        if(ofNF&&empE&&ofNF.length>1&&(empE.indexOf(ofNF)>=0||ofNF.indexOf(empE)>=0)){match=j;break;}
+        if(ofNF&&ocE&&ofNF.length>1&&(ocE.indexOf(ofNF)>=0||ofNF.indexOf(ocE)>=0)){match=j;break;}
         if(cnpjNF&&cnpjE&&cnpjE===cnpjNF){match=j;break;}
       }
       nfPendentes.push({file:file.name,dados:p,match:match,erro:null});
@@ -835,8 +859,10 @@ function renderNFResultados(){
           '<div class="form-group"><label>NF nº</label><input value="'+(p.num_nf||'')+'" id="nf-num-'+i+'"></div>'+
           '<div class="form-group"><label>Data emissão</label><input type="date" value="'+(p.data_emissao||'')+'" id="nf-dt-'+i+'"></div>'+
           '<div class="form-group"><label>Valor total R$</label><input type="number" value="'+(p.valor_total||'')+'" id="nf-val-'+i+'"></div>'+
-          '<div class="form-group"><label>OC (inf. complementares)</label><input value="'+(p.inf_complementares_oc||'')+'" readonly style="background:#f5f5f3"></div>'+
-          '<div class="form-group"><label>Local de entrega</label><input value="'+(p.inf_complementares_local_entrega||'')+'" readonly style="background:#f5f5f3"></div>'+
+          '<div class="form-group full"><label>Referência do pedido (editável — OC, OF, Empenho, Chamado...)</label><input value="'+(p.inf_ref||p.inf_complementares_oc||'')+'" id="nf-ref-'+i+'" style="font-weight:500"></div>'+
+          '<div class="form-group"><label>OC (número)</label><input value="'+(p.inf_complementares_oc||'')+'" id="nf-oc-'+i+'"></div>'+
+          '<div class="form-group"><label>OF / Chamado</label><input value="'+((p.inf_complementares_of||'')+(p.inf_complementares_chamado?' | '+p.inf_complementares_chamado:''))+'" id="nf-of-'+i+'"></div>'+
+          '<div class="form-group"><label>Local de entrega</label><input value="'+(p.inf_complementares_local_entrega||'')+'" id="nf-local-'+i+'"></div>'+
         '</div>'+
         '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:6px">Destinatário</div>'+
         '<div class="form-grid" style="gap:8px;margin-bottom:10px">'+
@@ -929,6 +955,86 @@ async function confirmarNFs(){
   nfPendentes=[];
   await carregarDados();
 }
+
+function abrirDetalhe(idx){
+  var e=itens[idx];
+  if(!e)return;
+  var empLabel=([e.emp,e.oc].filter(function(x){return x&&x!=='-';}).join(' / '))||'-';
+  var ownerOpts=responsaveis.map(function(r){return '<option'+(r===e.owner?' selected':'')+'>'+r+'</option>';}).join('');
+  var html=
+    '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #f0f0ec">Identificação</div>'+
+    '<input type="hidden" id="det-id" value="'+e.id+'">'+
+    '<input type="hidden" id="det-idx" value="'+idx+'">'+
+    '<div class="form-grid-3" style="gap:8px;margin-bottom:12px">'+
+      '<div class="form-group"><label>Nº Empenho</label><input id="det-emp" value="'+e.emp+'"></div>'+
+      '<div class="form-group"><label>Nº OC</label><input id="det-oc" value="'+e.oc+'"></div>'+
+      '<div class="form-group"><label>Responsável</label><select id="det-owner"><option value="">-- Selecione --</option>'+ownerOpts+'</select></div>'+
+      '<div class="form-group"><label>Razão Social</label><input id="det-razao" value="'+e.razao+'"></div>'+
+      '<div class="form-group"><label>Conta</label><input id="det-conta" value="'+e.conta+'"></div>'+
+      '<div class="form-group"><label>CNPJ</label><input id="det-cnpj" value="'+e.cnpj+'"></div>'+
+      '<div class="form-group"><label>Modalidade</label><input id="det-modalidade" value="'+e.modalidade+'"></div>'+
+      '<div class="form-group"><label>Licitação</label><input id="det-licitacao" value="'+e.licitacao+'"></div>'+
+      '<div class="form-group"><label>Contrato</label><input id="det-contrato" value="'+e.contrato+'"></div>'+
+      '<div class="form-group"><label>Data Emissão</label><input type="date" id="det-emissao" value="'+e.emissao+'"></div>'+
+    '</div>'+
+    '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #f0f0ec">Local de entrega</div>'+
+    '<div class="form-grid" style="gap:8px;margin-bottom:12px">'+
+      '<div class="form-group"><label>Departamento / Setor</label><input id="det-local-depto" value="'+e.localDepto+'"></div>'+
+      '<div class="form-group"><label>Local / Prédio</label><input id="det-local-predio" value="'+e.localPredio+'"></div>'+
+      '<div class="form-group full"><label>Endereço completo</label><input id="det-local-end" value="'+e.localEnd+'"></div>'+
+    '</div>'+
+    '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #f0f0ec">Item</div>'+
+    '<div class="form-grid" style="gap:8px;margin-bottom:12px">'+
+      '<div class="form-group full"><label>Descrição</label><input id="det-item" value="'+e.item.replace(/"/g,'&quot;')+'"></div>'+
+      '<div class="form-group"><label>SKU</label><input id="det-sku" value="'+e.sku+'"></div>'+
+      '<div class="form-group"><label>Quantidade</label><input type="number" id="det-qtd" value="'+e.qtd+'"></div>'+
+      '<div class="form-group"><label>Valor unitário R$</label><input type="number" id="det-unit" value="'+e.unit+'"></div>'+
+      '<div class="form-group"><label>Total R$</label><input type="number" id="det-total" value="'+e.total+'"></div>'+
+    '</div>'+
+    '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #f0f0ec">Prazo e NF</div>'+
+    '<div class="form-grid-3" style="gap:8px;margin-bottom:12px">'+
+      '<div class="form-group"><label>Prazo (dias)</label><input id="det-prazo" value="'+e.prazo+'"></div>'+
+      '<div class="form-group"><label>Data recebimento</label><input type="date" id="det-rec" value="'+e.recebimento+'"></div>'+
+      '<div class="form-group"><label>Vencimento</label><input type="date" id="det-venc" value="'+e.venc+'"></div>'+
+      '<div class="form-group"><label>NF nº</label><input id="det-nf" value="'+e.nf+'"></div>'+
+      '<div class="form-group"><label>Data NF</label><input type="date" id="det-nfdata" value="'+e.nfData+'"></div>'+
+      '<div class="form-group"><label>Valor NF R$</label><input type="number" id="det-nfval" value="'+e.nfValor+'"></div>'+
+    '</div>'+
+    '<div class="form-group"><label>Observações</label><textarea id="det-obs" rows="2">'+e.obs+'</textarea></div>';
+  document.getElementById('det-content').innerHTML=html;
+  document.getElementById('modal-det').classList.add('open');
+}
+
+async function salvarEdicao(){
+  var id=document.getElementById('det-id').value;
+  var idx=parseInt(document.getElementById('det-idx').value);
+  if(!id)return;
+  var campos=[
+    {col:1,id:'det-emp'},{col:2,id:'det-oc'},{col:3,id:'det-razao'},
+    {col:4,id:'det-cnpj'},{col:5,id:'det-owner'},{col:6,id:'det-modalidade'},
+    {col:7,id:'det-licitacao'},{col:8,id:'det-contrato'},{col:9,id:'det-emissao'},
+    {col:10,id:'det-local-depto'},{col:11,id:'det-local-predio'},{col:12,id:'det-local-end'},
+    {col:13,id:'det-item'},{col:14,id:'det-sku'},{col:15,id:'det-qtd'},
+    {col:16,id:'det-unit'},{col:17,id:'det-total'},{col:18,id:'det-prazo'},
+    {col:19,id:'det-rec'},{col:20,id:'det-venc'},{col:21,id:'det-obs'},
+    {col:22,id:'det-nf'},{col:23,id:'det-nfdata'},{col:24,id:'det-nfval'},
+    {col:28,id:'det-conta'}
+  ];
+  var updates=campos.map(function(c){
+    var el=document.getElementById(c.id);
+    return{id:id,col:c.col,val:el?el.value:''};
+  });
+  try{
+    var r=await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'updateMany',updates:updates})});
+    var d=await r.json();
+    if(d.ok){
+      toast('Alterações salvas!');
+      document.getElementById('modal-det').classList.remove('open');
+      await carregarDados();
+    }else{alert('Erro ao salvar.');}
+  }catch(err){alert('Erro: '+err.message);}
+}
+
 
 async function chamarClaude(b64,prompt){
   var resp=await fetch('https://api.anthropic.com/v1/messages',{
