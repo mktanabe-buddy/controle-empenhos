@@ -1589,11 +1589,10 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
   var rows = [];
   var headerRow = -1;
 
-  // encontrar linha de cabeçalho
+  // encontrar linha de cabeçalho (procura por "Cliente")
   for(var i=0;i<data.length;i++){
-    var row = data[i];
-    for(var j=0;j<row.length;j++){
-      if(String(row[j]||'').toLowerCase().includes('cliente')){
+    for(var j=0;j<(data[i]||[]).length;j++){
+      if(String(data[i][j]||'').trim().toLowerCase()==='cliente'){
         headerRow=i; break;
       }
     }
@@ -1601,42 +1600,96 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
   }
   if(headerRow<0) headerRow=1;
 
-  // mapear colunas pelo cabeçalho
+  // mapear colunas pelo cabeçalho — busca em todas as colunas
   var header = data[headerRow] || [];
-  var colMap = {};
-  header.forEach(function(h,i){
-    var hl = String(h||'').toLowerCase();
-    if(hl.includes('cliente')) colMap.cliente=i;
-    else if(hl.includes('cnpj')) colMap.cnpj=i;
-    else if(hl.includes('cadastro')) colMap.cadastro=i;
-    else if(hl.includes('valor')) colMap.valor=i;
-    else if(hl.includes('n/f')||hl.includes('nf torino')||hl.includes('nota')) colMap.nf=i;
-    else if(hl.includes('tipo')) colMap.tipoVenda=i;
-    else if(hl.includes('custo aq')) colMap.custoAq=i;
-    else if(hl.includes('margem')) colMap.margem=i;
-    else if(hl.includes('comiss') && hl.includes('aplic')) colMap.pctCom=i;
-    else if(hl.includes('comiss') && hl.includes('venda')) colMap.comissaoCalc=i;
-    else if(hl.includes('data') || hl.includes('receb')) colMap.dataReceb=i;
-  });
+  var colMap = {cliente:-1,cnpj:-1,cadastro:-1,valor:-1,nf:-1,tipoVenda:-1,
+                custoAq:-1,margem:-1,pctCom:-1,comissaoCalc:-1,dataReceb:-1};
+
+  for(var j=0;j<header.length;j++){
+    var hl = String(header[j]||'').toLowerCase().trim();
+    if(hl==='cliente') colMap.cliente=j;
+    else if(hl==='cnpj') colMap.cnpj=j;
+    else if(hl==='cadastro') colMap.cadastro=j;
+    else if(hl==='valor') colMap.valor=j;
+    else if(hl.includes('n/f')||hl.includes('nf torino')||hl==='nota') colMap.nf=j;
+    else if(hl.includes('tipo da venda')||hl==='tipo') colMap.tipoVenda=j;
+    else if(hl.includes('custo aq')) colMap.custoAq=j;
+    else if(hl==='margem') colMap.margem=j;
+    else if(hl.includes('comiss') && hl.includes('aplic')) colMap.pctCom=j;
+    else if(hl.includes('comiss') && hl.includes('vend')) colMap.comissaoCalc=j;
+    else if(hl.includes('data') || hl.includes('receb')) colMap.dataReceb=j;
+  }
+
+  // fallback: se não encontrou por nome, usar posição padrão da planilha Rosi
+  // Col0=vazio, Col1=Cliente, Col2=CNPJ, Col3=Cadastro, Col4=Valor,
+  // Col5=NF TORINO, Col6=Tipo, Col7=Custo Aq, Col8=Log, Col9=Adic, Col10=Total,
+  // Col11=Margem, Col12=% Comissão, Col13=Comissão Vendas, Col14=Data Receb
+  if(colMap.cliente<0) colMap.cliente=1;
+  if(colMap.cnpj<0) colMap.cnpj=2;
+  if(colMap.cadastro<0) colMap.cadastro=3;
+  if(colMap.valor<0) colMap.valor=4;
+  if(colMap.nf<0) colMap.nf=5;
+  if(colMap.tipoVenda<0) colMap.tipoVenda=6;
+  if(colMap.custoAq<0) colMap.custoAq=7;
+  if(colMap.margem<0) colMap.margem=11;
+  if(colMap.pctCom<0) colMap.pctCom=12;
+  if(colMap.comissaoCalc<0) colMap.comissaoCalc=13;
+  if(colMap.dataReceb<0) colMap.dataReceb=14;
 
   // processar linhas de dados
   for(var i=headerRow+1;i<data.length;i++){
-    var row=data[i];
+    var row=data[i]||[];
     var cliente=String(row[colMap.cliente]||'').trim();
-    var nf=String(row[colMap.nf]||'').trim();
-    if(!cliente||cliente==='nan'||!nf||nf==='nan') continue;
-    // ignorar linha de total
-    if(cliente.toLowerCase()==='nan' && nf==='nan') continue;
+    var nfRaw=row[colMap.nf];
+    var nf=nfRaw!==undefined&&nfRaw!==null&&String(nfRaw).trim()!==''?String(nfRaw).trim():'';
+
+    // pular linhas sem cliente ou sem NF
+    if(!cliente||cliente===''||cliente==='undefined') continue;
+    if(!nf||nf===''||nf==='undefined') continue;
+    // pular linha de total/subtotal
+    if(cliente.toUpperCase().includes('TOTAL')) continue;
 
     var dataReceb=String(row[colMap.dataReceb]||'').trim();
-    if(dataReceb.includes('DATA')) continue; // linha de cabeçalho repetida
+    // pular linha de cabeçalho repetida
+    if(dataReceb.toUpperCase().includes('DATA')) continue;
 
-    var comissaoCalc=Number(row[colMap.comissaoCalc])||0;
+    // tratar valor numérico
+    var valor=0;
+    var vRaw=row[colMap.valor];
+    if(vRaw!==undefined&&vRaw!==null){
+      var vStr=String(vRaw).replace(/[R$\s]/g,'').replace(',','.');
+      valor=parseFloat(vStr)||0;
+    }
+
+    var custoAq=0;
+    var cRaw=row[colMap.custoAq];
+    if(cRaw!==undefined&&cRaw!==null){
+      var cStr=String(cRaw).replace(/[R$\s]/g,'').replace(',','.');
+      custoAq=parseFloat(cStr)||0;
+    }
+
+    var margem=0;
+    var mRaw=row[colMap.margem];
+    if(mRaw!==undefined&&mRaw!==null){
+      var mStr=String(mRaw).replace('%','').replace(',','.');
+      margem=parseFloat(mStr)||0;
+      if(margem>1) margem=margem/100; // se veio como 12.1 em vez de 0.121
+    }
+
+    var comissaoCalc=0;
+    var ccRaw=row[colMap.comissaoCalc];
+    if(ccRaw!==undefined&&ccRaw!==null){
+      var ccStr=String(ccRaw).replace(/[R$\s]/g,'').replace(',','.');
+      comissaoCalc=parseFloat(ccStr)||0;
+    }
+
+    var pctCom=String(row[colMap.pctCom]||'2%').trim();
+    if(!pctCom||pctCom==='undefined') pctCom='2%';
+
     var statusNF=getStatusNF(dataReceb, tipo);
-    // comissão liberada: só para liberadas e quando é planilha devolvida
     var comissaoLib=0;
-    if(tipo==='devolvida' && statusNF==='liberada') {
-      comissaoLib=comissaoCalc; // padrão — pode ser sobrescrito
+    if(tipo==='devolvida' && statusNF==='liberada'){
+      comissaoLib=comissaoCalc;
     }
 
     rows.push({
@@ -1649,12 +1702,12 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
       cliente: cliente,
       cnpj: String(row[colMap.cnpj]||'').trim(),
       cadastro: String(row[colMap.cadastro]||'').trim(),
-      valor: Number(row[colMap.valor])||0,
+      valor: valor,
       nfTorino: nf,
       tipoVenda: String(row[colMap.tipoVenda]||'').trim(),
-      custoAq: Number(row[colMap.custoAq])||0,
-      margem: Number(row[colMap.margem])||0,
-      pctComissao: String(row[colMap.pctCom]||'2%').trim(),
+      custoAq: custoAq,
+      margem: margem,
+      pctComissao: pctCom,
       comissaoCalc: comissaoCalc,
       comissaoLib: comissaoLib,
       dataReceb: dataReceb,
