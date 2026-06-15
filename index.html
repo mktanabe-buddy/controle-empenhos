@@ -298,7 +298,21 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
           </div>
           <div class="form-group">
             <label>Mês/Ano de referência</label>
-            <input type="month" id="imp-mesano">
+            <div style="display:flex;gap:6px">
+              <select id="imp-mes" style="flex:1">
+                <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+                <option value="03">Março</option><option value="04">Abril</option>
+                <option value="05">Maio</option><option value="06">Junho</option>
+                <option value="07">Julho</option><option value="08">Agosto</option>
+                <option value="09">Setembro</option><option value="10">Outubro</option>
+                <option value="11">Novembro</option><option value="12">Dezembro</option>
+              </select>
+              <select id="imp-ano" style="width:90px">
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+              </select>
+            </div>
           </div>
           <div class="form-group">
             <label>Tipo da planilha</label>
@@ -346,7 +360,9 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
           <option value="sem_retorno">Sem retorno financeiro</option>
         </select>
         <input type="text" id="cb-busca" oninput="renderBaseNFs()" placeholder="Buscar NF, cliente..." style="width:200px">
-        <input type="month" id="cb-mes" onchange="renderBaseNFs()" style="width:auto">
+        <select id="cb-mes" onchange="renderBaseNFs()" style="width:auto">
+        <option value="">Todos os meses</option>
+      </select>
         <span style="margin-left:auto;font-size:12px;color:#999" id="cb-cnt"></span>
       </div>
       <div class="card" style="padding:0;overflow:hidden">
@@ -383,7 +399,21 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
           </div>
           <div class="form-group">
             <label>Mês/Ano da planilha a gerar</label>
-            <input type="month" id="ger-mesano">
+            <div style="display:flex;gap:6px">
+              <select id="ger-mes" style="flex:1">
+                <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+                <option value="03">Março</option><option value="04">Abril</option>
+                <option value="05">Maio</option><option value="06">Junho</option>
+                <option value="07">Julho</option><option value="08">Agosto</option>
+                <option value="09">Setembro</option><option value="10">Outubro</option>
+                <option value="11">Novembro</option><option value="12">Dezembro</option>
+              </select>
+              <select id="ger-ano" style="width:90px">
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+              </select>
+            </div>
           </div>
           <div class="form-group">
             <label>Planilha devolvida do mês anterior</label>
@@ -1507,7 +1537,7 @@ async function importarPlanilha(input) {
   try {
     var data = await lerXLSX(file);
     var vendedor = document.getElementById('imp-vendedor').value;
-    var mesano = document.getElementById('imp-mesano').value;
+    var mes = document.getElementById('imp-mes').value; var ano = document.getElementById('imp-ano').value; var mesano = ano+'-'+mes;
     var tipo = document.getElementById('imp-tipo').value;
 
     if(!mesano){statusEl.innerHTML='<div class="warn-box"><i class="ti ti-alert-triangle"></i> Selecione o mês/ano de referência antes de importar.</div>';return;}
@@ -1808,7 +1838,7 @@ function previewPlanilha() {
 
 function montarDadosPlanilha() {
   var vendor=document.getElementById('ger-vendedor').value;
-  var mesano=document.getElementById('ger-mesano').value;
+  var gmes=document.getElementById('ger-mes').value; var gano=document.getElementById('ger-ano').value; var mesano=gano+'-'+gmes;
   var planId=document.getElementById('ger-planilha-ant').value;
   var pct=document.getElementById('ger-pct').value||'2';
   if(!mesano){alert('Selecione o mês/ano da planilha a gerar.');return null;}
