@@ -874,7 +874,7 @@ function renderNFResultados(){
         '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:#999;margin-bottom:6px">Itens da NF ('+((p.itens||[]).length)+')</div>'+
         '<div style="background:#f5f5f3;border-radius:6px;padding:8px;margin-bottom:10px">'+itensList+'</div>'+
         '<div class="form-grid" style="gap:8px">'+
-          '<div class="form-group"><label>Responsável</label><select id="nf-owner-'+i+'"><option value="">-- Selecione --</option>'+responsaveis.map(function(r){return '<option>'+r+'</option>';}).join('')+'</select></div>'+
+          (nf.match!==null ? '<div class="form-group"><label>Responsável (do empenho)</label><input value="'+(matchItem?matchItem.owner:'')+'"\ readonly style="background:#f5f5f3" id="nf-owner-'+i+'"></div>' : '<div class="form-group"><label class="required">Responsável</label><select id="nf-owner-'+i+'"><option value="">-- Selecione --</option>'+responsaveis.map(function(r){return '<option>'+r+'</option>';}).join('')+'</select></div>')+
           '<div class="form-group"><label>Vincular ao item do painel</label><select id="nf-sel-'+i+'">'+opcoesItems+'</select></div>'+
           '<div class="form-group"><label>Faturamento parcial?</label><select id="nf-parcial-'+i+'"><option value="">Não — total</option><option value="1">Sim — parcial</option></select></div>'+
         '</div>';
@@ -885,6 +885,22 @@ function renderNFResultados(){
 
 async function confirmarNFs(){
   var salvos=0;var erros=[];
+  // validar responsável para registros sem match
+  for(var vi=0;vi<nfPendentes.length;vi++){
+    var vnf=nfPendentes[vi];if(vnf.erro)continue;
+    var vselEl=document.getElementById('nf-sel-'+vi);
+    var vselVal=vselEl?vselEl.value:'';
+    var vselIdx=(vselVal&&vselVal!=='')?parseInt(vselVal):NaN;
+    if(isNaN(vselIdx)){
+      var vownerEl=document.getElementById('nf-owner-'+vi);
+      if(!vownerEl||!vownerEl.value){
+        alert('Selecione o responsável para a NF '+vnf.file+' antes de confirmar.');
+        if(vownerEl)vownerEl.style.borderColor='#c62828';
+        return;
+      }
+    }
+  }
+
   for(var i=0;i<nfPendentes.length;i++){
     var nf=nfPendentes[i];if(nf.erro)continue;
     var p=nf.dados;
