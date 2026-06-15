@@ -91,7 +91,7 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
     <div class="metric"><div class="metric-val" id="m-total">0</div><div class="metric-lbl">Total de itens</div></div>
     <div class="metric"><div class="metric-val" style="color:#c62828" id="m-venc">0</div><div class="metric-lbl">Vencendo em 7 dias</div></div>
     <div class="metric"><div class="metric-val" style="color:#e65100" id="m-prorr">0</div><div class="metric-lbl">Sol. prorrogação</div></div>
-    <div class="metric"><div class="metric-val" style="color:#b71c1c" id="m-flag">0</div><div class="metric-lbl">Empenho não cadastrado</div></div>
+    <div class="metric"><div class="metric-val" style="color:#b71c1c" id="m-flag">0</div><div class="metric-lbl">Sem empenho</div></div>
     <div class="metric"><div class="metric-val" style="color:#2e7d32" id="m-fat">0</div><div class="metric-lbl">Faturados</div></div>
   </div>
 
@@ -111,7 +111,7 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
         <option value="ok">Em dia</option><option value="vencendo">Vencendo</option>
         <option value="vencido">Vencido</option><option value="faturado">Faturado</option>
         <option value="parcial">Fat. parcial</option><option value="prorrog">Sol. prorrogação</option>
-        <option value="flag">Empenho não cadastrado</option>
+        <option value="flag">Sem empenho</option>
       </select>
       <input type="text" id="f-busca" oninput="renderTabela()" placeholder="Buscar empenho, OC, cliente, conta..." style="width:240px">
       <button class="btn" onclick="carregarDados()" style="margin-left:auto"><i class="ti ti-refresh"></i> Atualizar</button>
@@ -343,7 +343,7 @@ function badgeHtml(s){
     faturado:'b-fat|Faturado',parcial:'b-parcial|Fat. parcial',
     prorrog:'b-info|Sol. prorrog.',vencido:'b-danger|Vencido',
     vencendo:'b-warn|Vencendo',ok:'b-ok|Não vencido',
-    flag:'b-flag|Empenho não cadastrado'
+    flag:'b-flag|Sem empenho'
   };
   var parts=(m[s]||'b-info|'+s).split('|');
   return '<span class="badge '+parts[0]+'">'+parts[1]+'</span>';
@@ -423,10 +423,10 @@ function renderTabela(){
       if(s==='faturado'){diasStr='<span style="color:#2e7d32">Faturado</span>';}
       else if(s==='flag'){diasStr='-';}
       else if(dias===null){diasStr='-';}
-      else if(dias<0){diasStr='<span style="color:#c62828;font-weight:600">Vencido há '+Math.abs(dias)+' dias</span>';}
-      else if(dias===0){diasStr='<span style="color:#c62828;font-weight:600">Vence hoje!</span>';}
-      else if(dias<=7){diasStr='<span style="color:#e65100;font-weight:600">Vence em '+dias+' dias</span>';}
-      else{diasStr='<span style="color:#2e7d32">Vence em '+dias+' dias</span>';}
+      else if(dias<0){diasStr='<span style="color:#c62828;font-weight:600">'+Math.abs(dias)+' dias</span>';}
+      else if(dias===0){diasStr='<span style="color:#c62828;font-weight:600">Hoje!</span>';}
+      else if(dias<=7){diasStr='<span style="color:#e65100;font-weight:600">'+dias+' dias</span>';}
+      else{diasStr='<span style="color:#2e7d32">'+dias+' dias</span>';}
       html+='<td>'+badgeHtml(s)+'</td>';
       html+='<td style="white-space:nowrap;font-size:12px">'+diasStr+'</td>';
       html+='<td>'+e.owner+'</td>';
