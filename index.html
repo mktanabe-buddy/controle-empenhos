@@ -1636,6 +1636,12 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
   if(colMap.comissaoCalc<0) colMap.comissaoCalc=13;
   if(colMap.dataReceb<0) colMap.dataReceb=14;
 
+  // diagnóstico — mostrar o que foi mapeado
+  console.log('HeaderRow:', headerRow);
+  console.log('ColMap:', JSON.stringify(colMap));
+  console.log('Linha header raw:', JSON.stringify(data[headerRow]));
+  if(data[headerRow+1]) console.log('Linha dados raw:', JSON.stringify(data[headerRow+1]));
+
   // processar linhas de dados
   for(var i=headerRow+1;i<data.length;i++){
     var row=data[i]||[];
