@@ -1653,16 +1653,20 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
   // 3. Para planilha DEVOLVIDA: identificar blocos
   // Bloco 1 (liberadas) = do headerRow+1 até primeira linha vazia
   // Bloco 2 (em aberto) = após as linhas vazias até o fim
-  var bloco1End = -1; // linha onde termina o bloco liberado
+  var bloco1End = -1; // índice da primeira linha vazia após o bloco liberado
   if(tipo==='devolvida'){
     for(var i=headerRow+1;i<data.length;i++){
       var row=data[i]||[];
       var cli=String(row[cm.cliente]||'').trim();
-      var nf=String(row[cm.nf]||'').trim();
-      if(!cli||cli===''||cli==='undefined'||cli==='null'){
+      var nf=row[cm.nf]!==undefined&&row[cm.nf]!==null?String(row[cm.nf]).trim():'';
+      // linha vazia = sem cliente E sem NF
+      var semCliente=!cli||cli===''||cli==='nan'||cli==='undefined'||cli==='null';
+      var semNF=!nf||nf===''||nf==='nan'||nf==='undefined';
+      if(semCliente&&semNF){
         bloco1End=i; break;
       }
     }
+    console.log('bloco1End detectado na linha:', bloco1End);
   }
 
   // 4. processar linhas
@@ -1688,21 +1692,21 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
 
     // determinar status da NF
     var statusNF;
+    var drUp=dataReceb.toUpperCase().trim();
     if(tipo==='devolvida'){
+      // BLOCO 1 (antes da linha vazia) = liberadas
+      // BLOCO 2 (após linha vazia) = em aberto ou cancelada
       if(bloco1End>0 && i<bloco1End){
-        statusNF='liberada'; // bloco 1 = liberadas
+        statusNF='liberada';
       }else{
-        var dr=dataReceb.toUpperCase();
-        if(dr.includes('CANCELADA'))statusNF='cancelada';
+        if(drUp.includes('CANCELADA'))statusNF='cancelada';
         else statusNF='aberto';
       }
     }else{
-      // planilha enviada: status pelo campo data
-      var dr=dataReceb.toUpperCase();
-      if(dr===''||dr==='EM ABERTO'||dr.includes('EM ABERTO'))statusNF='aberto';
-      else if(dr.includes('CANCELADA'))statusNF='cancelada';
-      else if(dr===''||dr==='NAN')statusNF='sem_retorno';
-      else statusNF='liberada';
+      // planilha ENVIADA: TODAS são sem retorno do financeiro ainda
+      // não existe nota "liberada" na planilha enviada
+      if(drUp.includes('CANCELADA'))statusNF='cancelada';
+      else statusNF='sem_retorno'; // ainda aguardando retorno do financeiro
     }
 
     var valor=parseNum(row[cm.valor]);
@@ -1724,7 +1728,8 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
 
     // comissão liberada: só bloco 1 da devolvida
     var comissaoLib=0;
-    if(tipo==='devolvida'&&statusNF==='liberada')comissaoLib=comissaoCalc;
+    // só tem comissão liberada no bloco 1 da planilha devolvida
+    if(tipo==='devolvida'&&statusNF==='liberada') comissaoLib=comissaoCalc;
 
     rows.push({
       id: Date.now().toString()+Math.random().toString(36).substr(2,4)+'_'+i,
@@ -2020,13 +2025,19 @@ function excluirImportacaoBtn(btn) {
 }
 
 async function excluirImportacao(planilhaId) {
-  if(!confirm('Excluir todas as NFs desta importação?')) return;
+  if(!confirm('Excluir todas as NFs desta importação? ('+planilhaId+')')) return;
   try {
-    // buscar todos os IDs desta planilha e excluir um a um
-    var ids = comissoes.filter(function(c){return c.planilhaId===planilhaId;}).map(function(c){return c.id;});
-    if(!ids.length){toast('Nenhum registro encontrado.');return;}
+    var ids = comissoes.filter(function(c){return String(c.planilhaId)===String(planilhaId);}).map(function(c){return c.id;});
+    if(!ids.length){
+      alert('Nenhum registro encontrado para planilhaId: '+planilhaId+'. Total em memória: '+comissoes.length);
+      return;
+    }
+    var btn=document.querySelector('[data-pid="'+planilhaId+'"]');
+    if(btn){btn.disabled=true;btn.textContent='...';}
     for(var i=0;i<ids.length;i++){
-      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissao',id:ids[i]})});
+      var r=await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissao',id:ids[i]})});
+      var d=await r.json();
+      if(!d.ok)console.warn('Erro ao excluir id:',ids[i]);
     }
     toast(ids.length+' registros excluídos.');
     await carregarComissoes();
@@ -2040,7 +2051,9 @@ function atualizarFiltrosBase() {
   var cv=cb.value;
   cb.innerHTML='<option value="">Todos os vendedores</option>'+vendors.map(function(v){return '<option'+(v===cv?' selected':'')+'>'+v+'</option>';}).join('');
 
-  var meses=[...new Set(comissoes.map(function(c){return c.mesano;}).filter(Boolean))].sort().reverse();
+  // normalizar mesano em todos os registros
+  comissoes.forEach(function(c){c.mesano=normalizarMesAno(c.mesano);});
+  var meses=[...new Set(comissoes.map(function(c){return c.mesano;}).filter(function(m){return m&&m.length>=7;}))].sort().reverse();
   var cm=document.getElementById('cb-mes');
   var cmv=cm.value;
   cm.innerHTML='<option value="">Todos os meses</option>'+meses.map(function(m){return '<option value="'+m+'"'+(m===cmv?' selected':'')+'>'+m+'</option>';}).join('');
