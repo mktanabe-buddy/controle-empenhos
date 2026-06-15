@@ -121,7 +121,7 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
       <div style="overflow-x:auto">
         <table>
           <thead><tr>
-            <th>Status</th><th>Responsável</th><th>Data Empenho</th><th>Prazo</th>
+            <th>Status</th><th>Dias p/ Vencer</th><th>Responsável</th><th>Data Empenho</th><th>Prazo</th>
             <th>Empenho / OC</th><th>NF</th><th>Data NF</th><th>Razão Social</th><th>Conta</th>
             <th>CNPJ</th><th>Item</th><th>Qtd</th><th>Vlr Unit</th><th>Total</th><th>Ações</th>
           </tr></thead>
@@ -342,7 +342,7 @@ function badgeHtml(s){
   var m={
     faturado:'b-fat|Faturado',parcial:'b-parcial|Fat. parcial',
     prorrog:'b-info|Sol. prorrog.',vencido:'b-danger|Vencido',
-    vencendo:'b-warn|Vencendo',ok:'b-ok|Em dia',
+    vencendo:'b-warn|Vencendo',ok:'b-ok|Não vencido',
     flag:'b-flag|Empenho não cadastrado'
   };
   var parts=(m[s]||'b-info|'+s).split('|');
@@ -401,7 +401,7 @@ function renderTabela(){
 
   var tb=document.getElementById('tb');
   if(!lista.length){
-    tb.innerHTML='<tr><td colspan="15" style="text-align:center;padding:2rem;color:#bbb">Nenhum item encontrado.</td></tr>';
+    tb.innerHTML='<tr><td colspan="16" style="text-align:center;padding:2rem;color:#bbb">Nenhum item encontrado.</td></tr>';
   }else{
     var html='';
     for(var i=0;i<lista.length;i++){
@@ -419,7 +419,16 @@ function renderTabela(){
       if(s==='flag')btnAcoes+='<button class="btn btn-sm" data-action="vinc" data-idx="'+idx+'" style="background:#fce4ec;color:#b71c1c;border-color:#ef9a9a"><i class="ti ti-link"></i> Vincular</button> ';
       btnAcoes+='<button class="btn btn-sm btn-danger" data-action="del" data-id="'+e.id+'"><i class="ti ti-trash"></i></button>';
       html+='<tr'+rowBg+'>';
+      var diasStr='-';
+      if(s==='faturado'){diasStr='<span style="color:#2e7d32">Faturado</span>';}
+      else if(s==='flag'){diasStr='-';}
+      else if(dias===null){diasStr='-';}
+      else if(dias<0){diasStr='<span style="color:#c62828;font-weight:600">Vencido há '+Math.abs(dias)+' dias</span>';}
+      else if(dias===0){diasStr='<span style="color:#c62828;font-weight:600">Vence hoje!</span>';}
+      else if(dias<=7){diasStr='<span style="color:#e65100;font-weight:600">Vence em '+dias+' dias</span>';}
+      else{diasStr='<span style="color:#2e7d32">Vence em '+dias+' dias</span>';}
       html+='<td>'+badgeHtml(s)+'</td>';
+      html+='<td style="white-space:nowrap;font-size:12px">'+diasStr+'</td>';
       html+='<td>'+e.owner+'</td>';
       html+='<td style="white-space:nowrap">'+fmtDt(e.emissao)+'</td>';
       html+='<td style="white-space:nowrap">'+(e.prazo&&e.prazo!=='-'?e.prazo+' dias':'-')+'<div class="prazo-bar"><div class="prazo-fill" style="width:'+pct+'%;background:'+bc+'"></div></div></td>';
@@ -559,6 +568,75 @@ function getItensDaForm(){
   }).filter(function(i){return i.item||i.qtd;});
 }
 
+async function verificarVinculacaoReversa(emp, oc){
+  // buscar registros com flag que coincidem com o empenho recém cadastrado
+  var candidatos=itens.filter(function(e){
+    if(String(e.semEmpenho||'')!=='1')return false;
+    var eEmp=String(e.emp||'').replace(/\D/g,'');
+    var eOc=String(e.oc||'').replace(/\D/g,'');
+    var nEmp=String(emp||'').replace(/\D/g,'');
+    var nOc=String(oc||'').replace(/\D/g,'');
+    if(nEmp&&eEmp&&nEmp.length>2&&eEmp.indexOf(nEmp)>=0)return true;
+    if(nOc&&eOc&&nOc.length>2&&eOc.indexOf(nOc)>=0)return true;
+    return false;
+  });
+
+  if(!candidatos.length)return;
+
+  // buscar os itens do empenho recém criado (ainda em memória após carregarDados)
+  var novosItens=itens.filter(function(e){
+    var eEmp=String(e.emp||'').replace(/\D/g,'');
+    var eOc=String(e.oc||'').replace(/\D/g,'');
+    var nEmp=String(emp||'').replace(/\D/g,'');
+    var nOc=String(oc||'').replace(/\D/g,'');
+    if(String(e.semEmpenho||'')==='1')return false;
+    if(nEmp&&eEmp&&nEmp.length>2&&eEmp.indexOf(nEmp)>=0)return true;
+    if(nOc&&eOc&&nOc.length>2&&eOc.indexOf(nOc)>=0)return true;
+    return false;
+  });
+
+  var msg='Encontramos '+candidatos.length+' NF(s) com flag "Empenho não cadastrado" que podem ser vinculadas ao empenho '+([emp,oc].filter(Boolean).join(' / '))+':\n\n';
+  candidatos.forEach(function(c){
+    msg+='• NF '+c.nf+' — '+c.razao+' — R$ '+fmt(c.nfValor)+'\n';
+  });
+  msg+='\nDeseja vincular automaticamente?';
+
+  if(!confirm(msg))return;
+
+  // vincular cada NF flag ao primeiro item do empenho novo (ou ao item correspondente)
+  var erros=[];
+  for(var i=0;i<candidatos.length;i++){
+    var c=candidatos[i];
+    // tentar encontrar item correspondente pelo produto
+    var alvo=novosItens.length>0?novosItens[0]:null;
+    if(novosItens.length>1){
+      // tentar casar pelo item/sku
+      var match=novosItens.find(function(n){
+        return String(n.item||'').toLowerCase().indexOf(String(c.item||'').substring(0,10).toLowerCase())>=0;
+      });
+      if(match)alvo=match;
+    }
+    if(!alvo){erros.push('Nenhum item do empenho encontrado para vincular NF '+c.nf);continue;}
+    try{
+      var updates=[
+        {id:c.id,col:27,val:''},       // limpar flag semEmpenho
+        {id:c.id,col:1,val:alvo.emp},  // emp
+        {id:c.id,col:2,val:alvo.oc},   // oc
+        {id:c.id,col:3,val:alvo.razao},// razao
+        {id:c.id,col:4,val:alvo.cnpj}, // cnpj
+        {id:c.id,col:5,val:alvo.owner} // owner
+      ];
+      var r=await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'updateMany',updates:updates})});
+      await r.json();
+    }catch(err){erros.push('Erro ao vincular NF '+c.nf+': '+err.message);}
+  }
+
+  await carregarDados();
+  if(erros.length){alert('Alguns erros:\n'+erros.join('\n'));}
+  else{toast(candidatos.length+' NF(s) vinculada(s) ao empenho!');}
+}
+
+
 function verificarDuplicata(emp,oc){
   return itens.filter(function(e){
     var eEmp=String(e.emp||'').replace(/\s/g,'').toLowerCase();
@@ -638,6 +716,8 @@ async function executarSalvar(emp,oc,owner,itensList){
     toast(itensList.length+' item(s) salvo(s)!');
     limpar();
     await carregarDados();
+    // verificar se há NFs com flag que podem ser vinculadas
+    await verificarVinculacaoReversa(emp, oc);
     showTab('painel',document.querySelector('.tab'));
   }catch(e){alert('Erro ao salvar: '+e.message);}
 }
