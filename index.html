@@ -1589,6 +1589,225 @@ async function importarPlanilha(input) {
   }
 }
 
+function parsearMesAno(mes, ano) {
+  var m = String(mes).padStart(2,'0');
+  return ano+'-'+m;
+}
+
+function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
+  var planilhaId = vendedor+'_'+mesano+'_'+tipo+'_'+Date.now();
+  var rows = [];
+
+  // 1. encontrar linha de cabeçalho
+  var headerRow = -1;
+  for(var i=0;i<data.length;i++){
+    for(var j=0;j<(data[i]||[]).length;j++){
+      if(String(data[i][j]||'').trim().toLowerCase()==='cliente'){
+        headerRow=i; break;
+      }
+    }
+    if(headerRow>=0) break;
+  }
+  if(headerRow<0) headerRow=1;
+
+  // 2. mapear colunas
+  var header = data[headerRow] || [];
+  var cm = {cliente:-1,cnpj:-1,cadastro:-1,valor:-1,nf:-1,tipoVenda:-1,
+            custoAq:-1,margem:-1,pctCom:-1,comissaoCalc:-1,dataReceb:-1};
+  for(var j=0;j<header.length;j++){
+    var hl = String(header[j]||'').toLowerCase().trim();
+    if(hl==='cliente') cm.cliente=j;
+    else if(hl==='cnpj') cm.cnpj=j;
+    else if(hl==='cadastro') cm.cadastro=j;
+    else if(hl==='valor') cm.valor=j;
+    else if(hl.includes('n/f')||hl.includes('nf torino')) cm.nf=j;
+    else if(hl.includes('tipo da venda')||hl==='tipo') cm.tipoVenda=j;
+    else if(hl.includes('custo aq')) cm.custoAq=j;
+    else if(hl==='margem') cm.margem=j;
+    else if(hl.includes('comiss')&&hl.includes('aplic')) cm.pctCom=j;
+    else if(hl.includes('comiss')&&hl.includes('vend')) cm.comissaoCalc=j;
+    else if(hl.includes('data')||hl.includes('receb')) cm.dataReceb=j;
+  }
+  // fallback posições fixas
+  if(cm.cliente<0)cm.cliente=1;
+  if(cm.cnpj<0)cm.cnpj=2;
+  if(cm.cadastro<0)cm.cadastro=3;
+  if(cm.valor<0)cm.valor=4;
+  if(cm.nf<0)cm.nf=5;
+  if(cm.tipoVenda<0)cm.tipoVenda=6;
+  if(cm.custoAq<0)cm.custoAq=7;
+  if(cm.margem<0)cm.margem=11;
+  if(cm.pctCom<0)cm.pctCom=12;
+  if(cm.comissaoCalc<0)cm.comissaoCalc=13;
+  if(cm.dataReceb<0)cm.dataReceb=14;
+
+  // 3. Para planilha DEVOLVIDA: identificar blocos
+  // Bloco 1 (liberadas) = do headerRow+1 até primeira linha vazia
+  // Bloco 2 (em aberto) = após as linhas vazias até o fim
+  var bloco1End = -1; // linha onde termina o bloco liberado
+  if(tipo==='devolvida'){
+    for(var i=headerRow+1;i<data.length;i++){
+      var row=data[i]||[];
+      var cli=String(row[cm.cliente]||'').trim();
+      var nf=String(row[cm.nf]||'').trim();
+      if(!cli||cli===''||cli==='undefined'||cli==='null'){
+        bloco1End=i; break;
+      }
+    }
+  }
+
+  // 4. processar linhas
+  function parseNum(raw){
+    if(raw===undefined||raw===null)return 0;
+    if(typeof raw==='number')return raw;
+    var s=String(raw).replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.');
+    return parseFloat(s)||0;
+  }
+
+  for(var i=headerRow+1;i<data.length;i++){
+    var row=data[i]||[];
+    var cli=String(row[cm.cliente]||'').trim();
+    var nfRaw=row[cm.nf];
+    var nf=nfRaw!==undefined&&nfRaw!==null?String(nfRaw).trim():'';
+
+    if(!cli||cli===''||cli==='nan'||cli==='undefined')continue;
+    if(!nf||nf===''||nf==='nan'||nf==='undefined')continue;
+    if(cli.toUpperCase().includes('TOTAL'))continue;
+
+    var dataReceb=String(row[cm.dataReceb]||'').trim();
+    if(dataReceb.toUpperCase().includes('DATA'))continue;
+
+    // determinar status da NF
+    var statusNF;
+    if(tipo==='devolvida'){
+      if(bloco1End>0 && i<bloco1End){
+        statusNF='liberada'; // bloco 1 = liberadas
+      }else{
+        var dr=dataReceb.toUpperCase();
+        if(dr.includes('CANCELADA'))statusNF='cancelada';
+        else statusNF='aberto';
+      }
+    }else{
+      // planilha enviada: status pelo campo data
+      var dr=dataReceb.toUpperCase();
+      if(dr===''||dr==='EM ABERTO'||dr.includes('EM ABERTO'))statusNF='aberto';
+      else if(dr.includes('CANCELADA'))statusNF='cancelada';
+      else if(dr===''||dr==='NAN')statusNF='sem_retorno';
+      else statusNF='liberada';
+    }
+
+    var valor=parseNum(row[cm.valor]);
+    var custoAq=parseNum(row[cm.custoAq]);
+    var comissaoCalc=parseNum(row[cm.comissaoCalc]);
+
+    var margem=0;
+    var mRaw=row[cm.margem];
+    if(mRaw!==undefined&&mRaw!==null){
+      if(typeof mRaw==='number'){margem=mRaw>1?mRaw/100:mRaw;}
+      else{var ms=String(mRaw).replace('%','').replace(',','.');margem=parseFloat(ms)||0;if(margem>1)margem=margem/100;}
+    }
+
+    var pctCom=String(row[cm.pctCom]||'2%').trim();
+    if(!pctCom||pctCom==='undefined'||pctCom==='nan')pctCom='2%';
+
+    var tipoVenda=String(row[cm.tipoVenda]||'').trim();
+    if(tipoVenda==='nan'||tipoVenda==='undefined')tipoVenda='';
+
+    // comissão liberada: só bloco 1 da devolvida
+    var comissaoLib=0;
+    if(tipo==='devolvida'&&statusNF==='liberada')comissaoLib=comissaoCalc;
+
+    rows.push({
+      id: Date.now().toString()+Math.random().toString(36).substr(2,4)+'_'+i,
+      planilhaId: planilhaId,
+      vendedor: vendedor,
+      mesano: mesano,
+      tipo: tipo,
+      statusPlanilha: statusNF==='liberada'?'liberada':(statusNF==='cancelada'?'cancelada':'aberto'),
+      cliente: cli,
+      cnpj: String(row[cm.cnpj]||'').trim(),
+      cadastro: String(row[cm.cadastro]||'').trim(),
+      valor: valor,
+      nfTorino: nf,
+      tipoVenda: tipoVenda,
+      custoAq: custoAq,
+      margem: margem,
+      pctComissao: pctCom,
+      comissaoCalc: comissaoCalc,
+      comissaoLib: comissaoLib,
+      dataReceb: dataReceb,
+      statusNF: statusNF,
+      importadoEm: new Date().toISOString()
+    });
+  }
+  return rows;
+}
+
+
+async function importarPlanilha(input) {
+  var file = input.files[0]; if(!file) return;
+  var statusEl = document.getElementById('imp-status');
+  var previewEl = document.getElementById('imp-preview');
+  statusEl.style.display='';
+  statusEl.innerHTML='<div class="ai-box"><span class="spinner"></span> Lendo planilha...</div>';
+  previewEl.innerHTML='';
+  document.getElementById('btn-confirmar-imp').style.display='none';
+
+  try {
+    var data = await lerXLSX(file);
+    var vendedor = document.getElementById('imp-vendedor').value;
+    var mes = document.getElementById('imp-mes').value; var ano = document.getElementById('imp-ano').value; var mesano = ano+'-'+mes;
+    var tipo = document.getElementById('imp-tipo').value;
+
+    if(!mesano){statusEl.innerHTML='<div class="warn-box"><i class="ti ti-alert-triangle"></i> Selecione o mês/ano de referência antes de importar.</div>';return;}
+
+    // parsear linhas
+    var rows = parsearPlanilhaComissao(data, vendedor, mesano, tipo);
+    dadosParaImportar = rows;
+
+    // preview
+    var liberadas = rows.filter(function(r){return r.statusNF==='liberada';});
+    var emAberto = rows.filter(function(r){return r.statusNF==='aberto';});
+    var canceladas = rows.filter(function(r){return r.statusNF==='cancelada';});
+    var semRetorno = rows.filter(function(r){return r.statusNF==='sem_retorno';});
+    var totalComLib = liberadas.reduce(function(s,r){return s+r.comissaoLib;},0);
+    var totalComCalc = rows.reduce(function(s,r){return s+r.comissaoCalc;},0);
+
+    statusEl.innerHTML='<div class="ai-box" style="background:#e8f5e9;color:#2e7d32"><i class="ti ti-check"></i> '+rows.length+' NFs lidas com sucesso!</div>';
+
+    var html = '<div class="form-grid-3" style="gap:10px;margin-bottom:12px">';
+    html += '<div class="metric"><div class="metric-val" style="color:#2e7d32">'+liberadas.length+'</div><div class="metric-lbl">Liberadas</div></div>';
+    html += '<div class="metric"><div class="metric-val" style="color:#e65100">'+emAberto.length+'</div><div class="metric-lbl">Em aberto</div></div>';
+    html += '<div class="metric"><div class="metric-val" style="color:#c62828">'+canceladas.length+'</div><div class="metric-lbl">NF cancelada</div></div>';
+    html += '</div>';
+
+    html += '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto"><table>';
+    html += '<thead><tr><th>Status</th><th>Cliente</th><th>CNPJ</th><th>Cadastro</th><th>NF Torino</th><th>Tipo</th><th>Valor</th><th>Custo Aq.</th><th>Margem</th><th>% Com.</th><th>Com. Calc.</th><th>Com. Lib.</th><th>Data Receb.</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      html += '<tr>';
+      html += '<td>'+badgeComissao(r.statusNF)+'</td>';
+      html += '<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.cliente+'</td>';
+      html += '<td style="font-size:11px;white-space:nowrap">'+r.cnpj+'</td>';
+      html += '<td>'+r.cadastro+'</td>';
+      html += '<td style="font-weight:500">'+r.nfTorino+'</td>';
+      html += '<td style="font-size:11px">'+r.tipoVenda+'</td>';
+      html += '<td style="white-space:nowrap">R$ '+fmt(r.valor)+'</td>';
+      html += '<td style="white-space:nowrap">R$ '+fmt(r.custoAq)+'</td>';
+      html += '<td>'+(r.margem?(r.margem*100).toFixed(2)+'%':'-')+'</td>';
+      html += '<td>'+r.pctComissao+'</td>';
+      html += '<td style="white-space:nowrap">R$ '+fmt(r.comissaoCalc)+'</td>';
+      html += '<td style="font-weight:'+(r.comissaoLib>0?'600':'400')+';white-space:nowrap">R$ '+fmt(r.comissaoLib)+'</td>';
+      html += '<td style="font-size:11px;white-space:nowrap">'+r.dataReceb+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+    previewEl.innerHTML = html;
+    document.getElementById('btn-confirmar-imp').style.display='';
+  } catch(e) {
+    statusEl.innerHTML='<div class="warn-box"><i class="ti ti-alert-triangle"></i> Erro ao ler planilha: '+e.message+'</div>';
+  }
+}
+
 function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
   var planilhaId = vendedor+'_'+mesano+'_'+tipo+'_'+Date.now();
   var rows = [];
@@ -1768,7 +1987,9 @@ function renderImportacoes() {
   lista.forEach(function(g){
     var libs=g.rows.filter(function(r){return r.statusNF==='liberada';}).length;
     var abs=g.rows.filter(function(r){return r.statusNF==='aberto';}).length;
-    var totalLib=g.rows.reduce(function(s,r){return s+r.comissaoLib;},0);
+    var totalComCalc=g.rows.reduce(function(s,r){return s+(r.comissaoCalc||0);},0);
+    var totalComLib=g.rows.reduce(function(s,r){return s+(r.comissaoLib||0);},0);
+    var comissaoStr=g.tipo==='devolvida'?('R$ '+fmt(totalComLib)):'-';
     html+='<tr>';
     html+='<td>'+g.vendedor+'</td>';
     html+='<td>'+g.mesano+'</td>';
@@ -1776,7 +1997,7 @@ function renderImportacoes() {
     html+='<td>'+g.rows.length+'</td>';
     html+='<td style="color:#2e7d32">'+libs+'</td>';
     html+='<td style="color:#e65100">'+abs+'</td>';
-    html+='<td>R$ '+fmt(totalLib)+'</td>';
+    html+='<td style="font-weight:500">'+(g.tipo==='devolvida'&&totalComLib>0?'<span style="color:#2e7d32">R$ '+fmt(totalComLib)+'</span>':g.tipo==='devolvida'?'R$ 0,00':'-')+'</td>';
     html+='<td style="font-size:11px">'+fmtDt(g.importadoEm.split('T')[0])+'</td>';
     html+='<td><button class="btn btn-sm btn-danger" data-pid="'+g.planilhaId+'" onclick="excluirImportacaoBtn(this)"><i class="ti ti-trash"></i></button></td>';
     html+='</tr>';
