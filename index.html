@@ -1690,10 +1690,15 @@ function renderImportacoes() {
     html+='<td style="color:#e65100">'+abs+'</td>';
     html+='<td>R$ '+fmt(totalLib)+'</td>';
     html+='<td style="font-size:11px">'+fmtDt(g.importadoEm.split('T')[0])+'</td>';
-    html+='<td><button class="btn btn-sm btn-danger" onclick="excluirImportacao(''+g.planilhaId+'')"><i class="ti ti-trash"></i></button></td>';
+    html+='<td><button class="btn btn-sm btn-danger" data-pid="'+g.planilhaId+'" onclick="excluirImportacaoBtn(this)"><i class="ti ti-trash"></i></button></td>';
     html+='</tr>';
   });
   tb.innerHTML=html;
+}
+
+function excluirImportacaoBtn(btn) {
+  var pid = btn.getAttribute('data-pid');
+  excluirImportacao(pid);
 }
 
 async function excluirImportacao(planilhaId) {
