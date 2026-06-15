@@ -2022,8 +2022,13 @@ function excluirImportacaoBtn(btn) {
 async function excluirImportacao(planilhaId) {
   if(!confirm('Excluir todas as NFs desta importação?')) return;
   try {
-    await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissoesByPlanilha',planilhaId:planilhaId})});
-    toast('Importação excluída.');
+    // buscar todos os IDs desta planilha e excluir um a um
+    var ids = comissoes.filter(function(c){return c.planilhaId===planilhaId;}).map(function(c){return c.id;});
+    if(!ids.length){toast('Nenhum registro encontrado.');return;}
+    for(var i=0;i<ids.length;i++){
+      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissao',id:ids[i]})});
+    }
+    toast(ids.length+' registros excluídos.');
     await carregarComissoes();
   } catch(e) { alert('Erro: '+e.message); }
 }
