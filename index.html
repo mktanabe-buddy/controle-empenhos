@@ -90,7 +90,16 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
 #login-btn:hover{background:#333;}
 #login-err{color:#c62828;font-size:12px;margin-top:8px;display:none;text-align:center;}
 #login-logo{font-size:28px;margin-bottom:16px;text-align:center;}
+
+.com-section{display:none}.com-section.active{display:block}
+.bar-wrap{background:#f0f0ec;border-radius:4px;height:20px;flex:1;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .3s}
+.status-lib{background:#e8f5e9;color:#2e7d32}
+.status-ab{background:#fff8e1;color:#e65100}
+.status-can{background:#fce4ec;color:#c62828}
+.status-sem{background:#f3e5f5;color:#6a1b9a}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -130,6 +139,7 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
     <button class="tab" onclick="showTab('novo',this)"><i class="ti ti-plus"></i> Novo empenho</button>
     <button class="tab" onclick="showTab('nf',this)"><i class="ti ti-file-invoice"></i> Registrar NF</button>
     <button class="tab" onclick="showTab('prorrog',this)"><i class="ti ti-clock-exclamation"></i> Prorrogações</button>
+    <button class="tab" id="tab-com" style="display:none" onclick="showTab('comissoes',this)"><i class="ti ti-chart-bar"></i> Comissões</button>
   </div>
 
   <!-- PAINEL -->
@@ -258,6 +268,175 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
   </div>
 </div>
 
+  <!-- COMISSÕES (admin only) -->
+  <div id="comissoes" class="section">
+
+    <!-- Sub-abas -->
+    <div style="display:flex;gap:2px;margin-bottom:16px;background:#ebebeb;border-radius:8px;padding:3px;width:fit-content">
+      <button class="tab active" id="ctab-import" onclick="showComTab('import',this)" style="font-size:12px;padding:5px 12px">Importar planilhas</button>
+      <button class="tab" id="ctab-base" onclick="showComTab('base',this)" style="font-size:12px;padding:5px 12px">Base de NFs</button>
+      <button class="tab" id="ctab-gerar" onclick="showComTab('gerar',this)" style="font-size:12px;padding:5px 12px">Gerar planilha</button>
+      <button class="tab" id="ctab-dash" onclick="showComTab('dash',this)" style="font-size:12px;padding:5px 12px">Dashboard</button>
+    </div>
+
+    <!-- IMPORTAR -->
+    <div id="com-import" class="com-section">
+      <div class="card">
+        <div class="ai-box">
+          <i class="ti ti-upload" style="font-size:15px;flex-shrink:0"></i>
+          Faça upload das planilhas mensais de comissão (enviadas ao financeiro ou devolvidas). O sistema identifica automaticamente os dois blocos.
+        </div>
+        <div class="form-grid-3" style="gap:10px;margin-bottom:14px">
+          <div class="form-group">
+            <label>Vendedor</label>
+            <select id="imp-vendedor">
+              <option value="rosi">rosi</option>
+              <option value="Henrique">Henrique</option>
+              <option value="nilton">nilton</option>
+              <option value="rafael">rafael</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mês/Ano de referência</label>
+            <input type="month" id="imp-mesano">
+          </div>
+          <div class="form-group">
+            <label>Tipo da planilha</label>
+            <select id="imp-tipo">
+              <option value="enviada">Enviada ao financeiro</option>
+              <option value="devolvida">Devolvida pelo financeiro (com liberações)</option>
+            </select>
+          </div>
+        </div>
+        <div class="upload-zone" onclick="document.getElementById('f-planilha-com').click()">
+          <input type="file" id="f-planilha-com" accept=".xlsx,.xls" style="display:none" onchange="importarPlanilha(this)">
+          <i class="ti ti-file-spreadsheet" style="font-size:28px;color:#bbb;display:block;margin-bottom:5px"></i>
+          <div style="font-size:13px;font-weight:500">Clique para anexar a planilha Excel (.xlsx)</div>
+        </div>
+        <div id="imp-status" style="display:none;margin-top:12px"></div>
+        <div id="imp-preview" style="margin-top:14px"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <button class="btn btn-primary" id="btn-confirmar-imp" style="display:none" onclick="confirmarImportacao()">
+            <i class="ti ti-device-floppy"></i> Confirmar importação
+          </button>
+        </div>
+      </div>
+
+      <!-- histórico de importações -->
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">Planilhas importadas</div>
+        <table>
+          <thead><tr>
+            <th>Vendedor</th><th>Mês/Ano</th><th>Tipo</th><th>NFs</th><th>Liberadas</th><th>Em aberto</th><th>Comissão total</th><th>Importado em</th><th></th>
+          </tr></thead>
+          <tbody id="tb-importacoes"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BASE DE NFs -->
+    <div id="com-base" class="com-section" style="display:none">
+      <div class="card" style="padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <select id="cb-vendedor" onchange="renderBaseNFs()" style="width:auto"><option value="">Todos os vendedores</option></select>
+        <select id="cb-status" onchange="renderBaseNFs()" style="width:auto">
+          <option value="">Todos os status</option>
+          <option value="liberada">Liberada</option>
+          <option value="aberto">Em aberto</option>
+          <option value="cancelada">NF cancelada</option>
+          <option value="sem_retorno">Sem retorno financeiro</option>
+        </select>
+        <input type="text" id="cb-busca" oninput="renderBaseNFs()" placeholder="Buscar NF, cliente..." style="width:200px">
+        <input type="month" id="cb-mes" onchange="renderBaseNFs()" style="width:auto">
+        <span style="margin-left:auto;font-size:12px;color:#999" id="cb-cnt"></span>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th>Status</th><th>Vendedor</th><th>Mês ref.</th><th>Cliente</th><th>CNPJ</th>
+              <th>NF Torino</th><th>Valor</th><th>Custo Aq.</th><th>Margem</th>
+              <th>% Comissão</th><th>Comissão calc.</th><th>Comissão lib.</th>
+              <th>Data receb.</th><th>Tipo venda</th><th>Planilha</th>
+            </tr></thead>
+            <tbody id="tb-base-nfs"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- GERAR PLANILHA -->
+    <div id="com-gerar" class="com-section" style="display:none">
+      <div class="card">
+        <div class="ai-box">
+          <i class="ti ti-sparkles" style="font-size:15px;flex-shrink:0"></i>
+          Gera automaticamente a planilha mensal de comissão no formato exigido pela diretoria. As NFs em aberto são herdadas da planilha devolvida do mês anterior, e as novas NFs são extraídas do sistema de empenhos.
+        </div>
+        <div class="form-grid" style="gap:10px;margin-bottom:14px">
+          <div class="form-group">
+            <label>Vendedor</label>
+            <select id="ger-vendedor">
+              <option value="rosi">rosi</option>
+              <option value="Henrique">Henrique</option>
+              <option value="nilton">nilton</option>
+              <option value="rafael">rafael</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Mês/Ano da planilha a gerar</label>
+            <input type="month" id="ger-mesano">
+          </div>
+          <div class="form-group">
+            <label>Planilha devolvida do mês anterior</label>
+            <select id="ger-planilha-ant">
+              <option value="">-- Selecione --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>% Comissão padrão para novas NFs</label>
+            <input type="number" id="ger-pct" value="2" step="0.1" min="0" max="100">
+          </div>
+        </div>
+        <div id="ger-preview" style="margin-top:10px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+          <button class="btn" onclick="previewPlanilha()"><i class="ti ti-eye"></i> Pré-visualizar</button>
+          <button class="btn btn-primary" onclick="gerarPlanilhaExcel()"><i class="ti ti-download"></i> Baixar planilha Excel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="com-dash" class="com-section" style="display:none">
+      <div class="metrics" style="grid-template-columns:repeat(4,1fr)">
+        <div class="metric"><div class="metric-val" id="d-total-nfs">0</div><div class="metric-lbl">Total de NFs</div></div>
+        <div class="metric"><div class="metric-val" style="color:#2e7d32" id="d-liberadas">0</div><div class="metric-lbl">NFs liberadas</div></div>
+        <div class="metric"><div class="metric-val" style="color:#e65100" id="d-aberto">0</div><div class="metric-lbl">Em aberto</div></div>
+        <div class="metric"><div class="metric-val" style="color:#1a56db" id="d-comissao">R$ 0</div><div class="metric-lbl">Comissão total paga</div></div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px;max-width:200px">
+        <label>Filtrar por período</label>
+        <select id="dash-periodo" onchange="renderDashboard()">
+          <option value="">Todo o histórico</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Comissão por vendedor</div>
+          <div id="dash-por-vendedor"></div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">NFs por status</div>
+          <div id="dash-por-status"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Vendas por mês (valor total das NFs)</div>
+        <div id="dash-por-mes" style="overflow-x:auto"></div>
+      </div>
+    </div>
+
+  </div>
+
+
 <!-- MODAL PRORROGAÇÃO -->
 <div class="overlay" id="modal-p">
   <div class="modal">
@@ -329,6 +508,11 @@ function fazerLogin(){
     usuarioAtual=USUARIOS[user];
     usuarioAtual.login=user;
     document.getElementById('login-screen').style.display='none';
+    // mostrar aba comissões para admin
+    if(usuarioAtual.admin){
+      document.getElementById('tab-com').style.display='';
+      carregarComissoes();
+    }
     // pré-filtrar por owner se não for admin
     if(!usuarioAtual.admin){
       var fo=document.getElementById('f-owner');
@@ -1247,6 +1431,552 @@ function toBase64(file){
 limpar();
 // carregarDados() chamado após login
 setInterval(function(){if(usuarioAtual)carregarDados();},90000);
+
+// ==========================================
+// MÓDULO DE COMISSÕES
+// ==========================================
+
+var comissoes = [];
+var importacoesPlanilhas = [];
+var dadosParaImportar = null;
+
+function showComTab(id, btn) {
+  document.querySelectorAll('.com-section').forEach(function(s){s.classList.remove('active');s.style.display='none';});
+  document.querySelectorAll('#comissoes .tab').forEach(function(t){t.classList.remove('active');});
+  var el = document.getElementById('com-'+id);
+  if(el){el.style.display='';el.classList.add('active');}
+  if(btn)btn.classList.add('active');
+  if(id==='base')renderBaseNFs();
+  if(id==='dash')renderDashboard();
+  if(id==='gerar')atualizarSelectPlanilhas();
+}
+
+async function carregarComissoes() {
+  try {
+    var r = await fetch(WEB_APP+'?action=listComissoes');
+    var rows = await r.json();
+    if(!rows||rows.length<=1){comissoes=[];renderImportacoes();return;}
+    comissoes = rows.slice(1).filter(function(r){return r[0];}).map(function(r){
+      return {
+        id:String(r[0]), planilhaId:String(r[1]||''), vendedor:String(r[2]||''),
+        mesano:String(r[3]||''), tipo:String(r[4]||''), statusPlanilha:String(r[5]||''),
+        cliente:String(r[6]||''), cnpj:String(r[7]||''), cadastro:String(r[8]||''),
+        valor:Number(r[9])||0, nfTorino:String(r[10]||''), tipoVenda:String(r[11]||''),
+        custoAq:Number(r[12])||0, margem:Number(r[13])||0,
+        pctComissao:String(r[14]||'2%'), comissaoCalc:Number(r[15])||0,
+        comissaoLib:Number(r[16])||0, dataReceb:String(r[17]||''),
+        statusNF:String(r[18]||''), importadoEm:String(r[19]||'')
+      };
+    });
+    renderImportacoes();
+    atualizarFiltrosBase();
+    atualizarSelectPlanilhas();
+  } catch(e) { console.error('Erro ao carregar comissões:', e); }
+}
+
+function getStatusNF(dataReceb, tipo) {
+  if(!dataReceb || dataReceb==='-' || dataReceb==='nan') return 'sem_retorno';
+  var d = String(dataReceb).trim().toUpperCase();
+  if(d==='EM ABERTO' || d==='EM ABERTO VERIFICAR') return 'aberto';
+  if(d.includes('CANCELADA')) return 'cancelada';
+  // tem data real = liberada
+  return 'liberada';
+}
+
+function badgeComissao(status) {
+  var m = {
+    liberada:'status-lib|Liberada',
+    aberto:'status-ab|Em aberto',
+    cancelada:'status-can|NF cancelada',
+    sem_retorno:'status-sem|Sem retorno'
+  };
+  var parts = (m[status]||'status-sem|'+status).split('|');
+  return '<span class="badge '+parts[0]+'">'+parts[1]+'</span>';
+}
+
+// ---- IMPORTAÇÃO ----
+async function importarPlanilha(input) {
+  var file = input.files[0]; if(!file) return;
+  var statusEl = document.getElementById('imp-status');
+  var previewEl = document.getElementById('imp-preview');
+  statusEl.style.display='';
+  statusEl.innerHTML='<div class="ai-box"><span class="spinner"></span> Lendo planilha...</div>';
+  previewEl.innerHTML='';
+  document.getElementById('btn-confirmar-imp').style.display='none';
+
+  try {
+    var data = await lerXLSX(file);
+    var vendedor = document.getElementById('imp-vendedor').value;
+    var mesano = document.getElementById('imp-mesano').value;
+    var tipo = document.getElementById('imp-tipo').value;
+
+    if(!mesano){statusEl.innerHTML='<div class="warn-box"><i class="ti ti-alert-triangle"></i> Selecione o mês/ano de referência antes de importar.</div>';return;}
+
+    // parsear linhas
+    var rows = parsearPlanilhaComissao(data, vendedor, mesano, tipo);
+    dadosParaImportar = rows;
+
+    // preview
+    var liberadas = rows.filter(function(r){return r.statusNF==='liberada';});
+    var emAberto = rows.filter(function(r){return r.statusNF==='aberto';});
+    var canceladas = rows.filter(function(r){return r.statusNF==='cancelada';});
+    var semRetorno = rows.filter(function(r){return r.statusNF==='sem_retorno';});
+    var totalComLib = liberadas.reduce(function(s,r){return s+r.comissaoLib;},0);
+    var totalComCalc = rows.reduce(function(s,r){return s+r.comissaoCalc;},0);
+
+    statusEl.innerHTML='<div class="ai-box" style="background:#e8f5e9;color:#2e7d32"><i class="ti ti-check"></i> '+rows.length+' NFs lidas com sucesso!</div>';
+
+    var html = '<div class="form-grid-3" style="gap:10px;margin-bottom:12px">';
+    html += '<div class="metric"><div class="metric-val" style="color:#2e7d32">'+liberadas.length+'</div><div class="metric-lbl">Liberadas</div></div>';
+    html += '<div class="metric"><div class="metric-val" style="color:#e65100">'+emAberto.length+'</div><div class="metric-lbl">Em aberto</div></div>';
+    html += '<div class="metric"><div class="metric-val" style="color:#c62828">'+canceladas.length+'</div><div class="metric-lbl">NF cancelada</div></div>';
+    html += '</div>';
+
+    html += '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto"><table>';
+    html += '<thead><tr><th>Status</th><th>Cliente</th><th>NF Torino</th><th>Valor</th><th>% Com.</th><th>Com. Calc.</th><th>Com. Lib.</th><th>Data Receb.</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      html += '<tr>';
+      html += '<td>'+badgeComissao(r.statusNF)+'</td>';
+      html += '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.cliente+'</td>';
+      html += '<td>'+r.nfTorino+'</td>';
+      html += '<td>R$ '+fmt(r.valor)+'</td>';
+      html += '<td>'+r.pctComissao+'</td>';
+      html += '<td>R$ '+fmt(r.comissaoCalc)+'</td>';
+      html += '<td style="font-weight:'+(r.comissaoLib>0?'600':'400')+'">R$ '+fmt(r.comissaoLib)+'</td>';
+      html += '<td style="font-size:11px">'+r.dataReceb+'</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+    previewEl.innerHTML = html;
+    document.getElementById('btn-confirmar-imp').style.display='';
+  } catch(e) {
+    statusEl.innerHTML='<div class="warn-box"><i class="ti ti-alert-triangle"></i> Erro ao ler planilha: '+e.message+'</div>';
+  }
+}
+
+function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
+  var planilhaId = vendedor+'_'+mesano+'_'+tipo+'_'+Date.now();
+  var rows = [];
+  var headerRow = -1;
+
+  // encontrar linha de cabeçalho
+  for(var i=0;i<data.length;i++){
+    var row = data[i];
+    for(var j=0;j<row.length;j++){
+      if(String(row[j]||'').toLowerCase().includes('cliente')){
+        headerRow=i; break;
+      }
+    }
+    if(headerRow>=0) break;
+  }
+  if(headerRow<0) headerRow=1;
+
+  // mapear colunas pelo cabeçalho
+  var header = data[headerRow] || [];
+  var colMap = {};
+  header.forEach(function(h,i){
+    var hl = String(h||'').toLowerCase();
+    if(hl.includes('cliente')) colMap.cliente=i;
+    else if(hl.includes('cnpj')) colMap.cnpj=i;
+    else if(hl.includes('cadastro')) colMap.cadastro=i;
+    else if(hl.includes('valor')) colMap.valor=i;
+    else if(hl.includes('n/f')||hl.includes('nf torino')||hl.includes('nota')) colMap.nf=i;
+    else if(hl.includes('tipo')) colMap.tipoVenda=i;
+    else if(hl.includes('custo aq')) colMap.custoAq=i;
+    else if(hl.includes('margem')) colMap.margem=i;
+    else if(hl.includes('comiss') && hl.includes('aplic')) colMap.pctCom=i;
+    else if(hl.includes('comiss') && hl.includes('venda')) colMap.comissaoCalc=i;
+    else if(hl.includes('data') || hl.includes('receb')) colMap.dataReceb=i;
+  });
+
+  // processar linhas de dados
+  for(var i=headerRow+1;i<data.length;i++){
+    var row=data[i];
+    var cliente=String(row[colMap.cliente]||'').trim();
+    var nf=String(row[colMap.nf]||'').trim();
+    if(!cliente||cliente==='nan'||!nf||nf==='nan') continue;
+    // ignorar linha de total
+    if(cliente.toLowerCase()==='nan' && nf==='nan') continue;
+
+    var dataReceb=String(row[colMap.dataReceb]||'').trim();
+    if(dataReceb.includes('DATA')) continue; // linha de cabeçalho repetida
+
+    var comissaoCalc=Number(row[colMap.comissaoCalc])||0;
+    var statusNF=getStatusNF(dataReceb, tipo);
+    // comissão liberada: só para liberadas e quando é planilha devolvida
+    var comissaoLib=0;
+    if(tipo==='devolvida' && statusNF==='liberada') {
+      comissaoLib=comissaoCalc; // padrão — pode ser sobrescrito
+    }
+
+    rows.push({
+      id: Date.now().toString()+Math.random().toString(36).substr(2,4)+'_'+i,
+      planilhaId: planilhaId,
+      vendedor: vendedor,
+      mesano: mesano,
+      tipo: tipo,
+      statusPlanilha: tipo==='devolvida'?(statusNF==='liberada'?'liberada':'aberto'):'enviada',
+      cliente: cliente,
+      cnpj: String(row[colMap.cnpj]||'').trim(),
+      cadastro: String(row[colMap.cadastro]||'').trim(),
+      valor: Number(row[colMap.valor])||0,
+      nfTorino: nf,
+      tipoVenda: String(row[colMap.tipoVenda]||'').trim(),
+      custoAq: Number(row[colMap.custoAq])||0,
+      margem: Number(row[colMap.margem])||0,
+      pctComissao: String(row[colMap.pctCom]||'2%').trim(),
+      comissaoCalc: comissaoCalc,
+      comissaoLib: comissaoLib,
+      dataReceb: dataReceb,
+      statusNF: statusNF,
+      importadoEm: new Date().toISOString()
+    });
+  }
+  return rows;
+}
+
+async function confirmarImportacao() {
+  if(!dadosParaImportar||!dadosParaImportar.length) return;
+  var btn=document.getElementById('btn-confirmar-imp');
+  btn.disabled=true; btn.textContent='Salvando...';
+  try {
+    var batchRows = dadosParaImportar.map(function(r){
+      return [r.id,r.planilhaId,r.vendedor,r.mesano,r.tipo,r.statusPlanilha,
+              r.cliente,r.cnpj,r.cadastro,r.valor,r.nfTorino,r.tipoVenda,
+              r.custoAq,r.margem,r.pctComissao,r.comissaoCalc,r.comissaoLib,
+              r.dataReceb,r.statusNF,r.importadoEm];
+    });
+    // enviar em lotes de 50
+    for(var i=0;i<batchRows.length;i+=50){
+      var batch=batchRows.slice(i,i+50);
+      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'saveComissaoBatch',rows:batch})});
+    }
+    toast(dadosParaImportar.length+' NFs importadas!');
+    dadosParaImportar=null;
+    document.getElementById('imp-preview').innerHTML='';
+    document.getElementById('imp-status').style.display='none';
+    btn.style.display='none';
+    document.getElementById('f-planilha-com').value='';
+    await carregarComissoes();
+  } catch(e) {
+    alert('Erro ao salvar: '+e.message);
+  }
+  btn.disabled=false;
+  btn.innerHTML='<i class="ti ti-device-floppy"></i> Confirmar importação';
+}
+
+function renderImportacoes() {
+  // agrupar por planilhaId
+  var grupos={};
+  comissoes.forEach(function(c){
+    var k=c.planilhaId;
+    if(!grupos[k]) grupos[k]={planilhaId:k,vendedor:c.vendedor,mesano:c.mesano,tipo:c.tipo,importadoEm:c.importadoEm,rows:[]};
+    grupos[k].rows.push(c);
+  });
+  var lista=Object.values(grupos).sort(function(a,b){return b.mesano.localeCompare(a.mesano);});
+  var tb=document.getElementById('tb-importacoes');
+  if(!lista.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:1.5rem;color:#bbb">Nenhuma planilha importada ainda.</td></tr>';return;}
+  var html='';
+  lista.forEach(function(g){
+    var libs=g.rows.filter(function(r){return r.statusNF==='liberada';}).length;
+    var abs=g.rows.filter(function(r){return r.statusNF==='aberto';}).length;
+    var totalLib=g.rows.reduce(function(s,r){return s+r.comissaoLib;},0);
+    html+='<tr>';
+    html+='<td>'+g.vendedor+'</td>';
+    html+='<td>'+g.mesano+'</td>';
+    html+='<td><span class="badge '+(g.tipo==='devolvida'?'b-ok':'b-info')+'">'+(g.tipo==='devolvida'?'Devolvida':'Enviada')+'</span></td>';
+    html+='<td>'+g.rows.length+'</td>';
+    html+='<td style="color:#2e7d32">'+libs+'</td>';
+    html+='<td style="color:#e65100">'+abs+'</td>';
+    html+='<td>R$ '+fmt(totalLib)+'</td>';
+    html+='<td style="font-size:11px">'+fmtDt(g.importadoEm.split('T')[0])+'</td>';
+    html+='<td><button class="btn btn-sm btn-danger" onclick="excluirImportacao(''+g.planilhaId+'')"><i class="ti ti-trash"></i></button></td>';
+    html+='</tr>';
+  });
+  tb.innerHTML=html;
+}
+
+async function excluirImportacao(planilhaId) {
+  if(!confirm('Excluir todas as NFs desta importação?')) return;
+  try {
+    await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissoesByPlanilha',planilhaId:planilhaId})});
+    toast('Importação excluída.');
+    await carregarComissoes();
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+// ---- BASE DE NFs ----
+function atualizarFiltrosBase() {
+  var vendors=[...new Set(comissoes.map(function(c){return c.vendedor;}).filter(Boolean))];
+  var cb=document.getElementById('cb-vendedor');
+  var cv=cb.value;
+  cb.innerHTML='<option value="">Todos os vendedores</option>'+vendors.map(function(v){return '<option'+(v===cv?' selected':'')+'>'+v+'</option>';}).join('');
+
+  var meses=[...new Set(comissoes.map(function(c){return c.mesano;}).filter(Boolean))].sort().reverse();
+  var cm=document.getElementById('cb-mes');
+  var cmv=cm.value;
+  cm.innerHTML='<option value="">Todos os meses</option>'+meses.map(function(m){return '<option value="'+m+'"'+(m===cmv?' selected':'')+'>'+m+'</option>';}).join('');
+
+  var dp=document.getElementById('dash-periodo');
+  var dpv=dp.value;
+  dp.innerHTML='<option value="">Todo o histórico</option>'+meses.map(function(m){return '<option value="'+m+'"'+(m===dpv?' selected':'')+'>'+m+'</option>';}).join('');
+}
+
+function renderBaseNFs() {
+  var vendor=document.getElementById('cb-vendedor').value;
+  var status=document.getElementById('cb-status').value;
+  var busca=document.getElementById('cb-busca').value.toLowerCase();
+  var mes=document.getElementById('cb-mes').value;
+
+  var lista=comissoes.filter(function(c){
+    if(vendor&&c.vendedor!==vendor)return false;
+    if(status&&c.statusNF!==status)return false;
+    if(mes&&c.mesano!==mes)return false;
+    if(busca&&!(c.cliente+' '+c.nfTorino+' '+c.cnpj).toLowerCase().includes(busca))return false;
+    return true;
+  });
+
+  var tb=document.getElementById('tb-base-nfs');
+  if(!lista.length){tb.innerHTML='<tr><td colspan="15" style="text-align:center;padding:1.5rem;color:#bbb">Nenhuma NF encontrada.</td></tr>';return;}
+
+  var html='';
+  lista.forEach(function(c){
+    html+='<tr>';
+    html+='<td>'+badgeComissao(c.statusNF)+'</td>';
+    html+='<td>'+c.vendedor+'</td>';
+    html+='<td>'+c.mesano+'</td>';
+    html+='<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.cliente+'</td>';
+    html+='<td style="font-size:11px">'+c.cnpj+'</td>';
+    html+='<td style="font-weight:500">'+c.nfTorino+'</td>';
+    html+='<td style="white-space:nowrap">R$ '+fmt(c.valor)+'</td>';
+    html+='<td style="white-space:nowrap">R$ '+fmt(c.custoAq)+'</td>';
+    html+='<td>'+(c.margem?(c.margem*100).toFixed(1)+'%':'-')+'</td>';
+    html+='<td>'+c.pctComissao+'</td>';
+    html+='<td style="white-space:nowrap">R$ '+fmt(c.comissaoCalc)+'</td>';
+    html+='<td style="white-space:nowrap;font-weight:'+(c.comissaoLib>0?'600':'400')+';color:'+(c.comissaoLib>0?'#2e7d32':'#999')+'">R$ '+fmt(c.comissaoLib)+'</td>';
+    html+='<td style="font-size:11px;white-space:nowrap">'+c.dataReceb+'</td>';
+    html+='<td>'+c.tipoVenda+'</td>';
+    html+='<td style="font-size:11px">'+c.tipo+'</td>';
+    html+='</tr>';
+  });
+  tb.innerHTML=html;
+  document.getElementById('cb-cnt').textContent=lista.length+' NFs';
+}
+
+// ---- GERAR PLANILHA ----
+function atualizarSelectPlanilhas() {
+  var vendor=document.getElementById('ger-vendedor').value;
+  var grupos={};
+  comissoes.filter(function(c){return c.vendedor===vendor&&c.tipo==='devolvida';}).forEach(function(c){
+    if(!grupos[c.planilhaId]) grupos[c.planilhaId]={id:c.planilhaId,mesano:c.mesano};
+  });
+  var lista=Object.values(grupos).sort(function(a,b){return b.mesano.localeCompare(a.mesano);});
+  var sel=document.getElementById('ger-planilha-ant');
+  sel.innerHTML='<option value="">-- Selecione planilha devolvida do mês anterior --</option>'+
+    lista.map(function(g){return '<option value="'+g.id+'">'+g.mesano+' — devolvida pelo financeiro</option>';}).join('');
+}
+
+function previewPlanilha() {
+  var result=montarDadosPlanilha();
+  if(!result){return;}
+  var html='<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto"><table>';
+  html+='<thead><tr><th>Cliente</th><th>CNPJ</th><th>Cadastro</th><th>Valor</th><th>NF Torino</th><th>Tipo</th><th>Custo Aq.</th><th>Margem</th><th>% Com.</th><th>Comissão</th><th>Data Receb.</th></tr></thead><tbody>';
+  result.rows.forEach(function(r){
+    html+='<tr'+(r._nova?' style="background:#f0fff0"':r._aberto?' style="background:#fffdf0"':'')+'>';
+    html+='<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.cliente+'</td>';
+    html+='<td style="font-size:11px">'+r.cnpj+'</td>';
+    html+='<td>'+r.cadastro+'</td>';
+    html+='<td>R$ '+fmt(r.valor)+'</td>';
+    html+='<td>'+r.nfTorino+'</td>';
+    html+='<td>'+r.tipoVenda+'</td>';
+    html+='<td>R$ '+fmt(r.custoAq)+'</td>';
+    html+='<td>'+(r.margem?(r.margem*100).toFixed(2)+'%':'-')+'</td>';
+    html+='<td>'+r.pctComissao+'</td>';
+    html+='<td>R$ '+fmt(r.comissaoCalc)+'</td>';
+    html+='<td style="font-size:11px">'+r.dataReceb+'</td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table></div></div>';
+  html+='<div style="font-size:12px;color:#999;margin-top:8px">🟢 Verde = NFs novas do período &nbsp; 🟡 Amarelo = NFs em aberto herdadas</div>';
+  document.getElementById('ger-preview').innerHTML=html;
+}
+
+function montarDadosPlanilha() {
+  var vendor=document.getElementById('ger-vendedor').value;
+  var mesano=document.getElementById('ger-mesano').value;
+  var planId=document.getElementById('ger-planilha-ant').value;
+  var pct=document.getElementById('ger-pct').value||'2';
+  if(!mesano){alert('Selecione o mês/ano da planilha a gerar.');return null;}
+
+  var rows=[];
+
+  // 1. NFs em aberto da planilha devolvida anterior
+  if(planId){
+    var emAberto=comissoes.filter(function(c){
+      return c.planilhaId===planId&&(c.statusNF==='aberto'||c.statusNF==='cancelada');
+    });
+    emAberto.forEach(function(c){
+      rows.push({
+        cliente:c.cliente,cnpj:c.cnpj,cadastro:c.cadastro,valor:c.valor,
+        nfTorino:c.nfTorino,tipoVenda:c.tipoVenda,custoAq:c.custoAq,
+        margem:c.margem,pctComissao:c.pctComissao,comissaoCalc:c.comissaoCalc,
+        dataReceb:c.dataReceb,_aberto:true,_nova:false
+      });
+    });
+  }
+
+  // 2. NFs novas do sistema de empenhos (do período selecionado)
+  var [ano,mes]=mesano.split('-');
+  var nfsExistentes=new Set(rows.map(function(r){return r.nfTorino;}));
+  itens.filter(function(e){
+    if(e.owner!==vendor&&vendor!=='todos')return false;
+    if(!e.nf||e.nf==='-')return false;
+    // verificar se a NF é do período
+    if(e.nfData){
+      var d=new Date(e.nfData+'T12:00:00');
+      if(d.getFullYear()===parseInt(ano)&&(d.getMonth()+1)===parseInt(mes)){return true;}
+    }
+    return false;
+  }).forEach(function(e){
+    if(nfsExistentes.has(e.nf))return;
+    var valor=Number(e.total)||0;
+    var custoAq=Number(e.unit)||0; // aproximação
+    var margem=valor>0?(valor-custoAq)/valor:0;
+    var comissao=valor*parseFloat(pct)/100;
+    rows.push({
+      cliente:e.razao,cnpj:e.cnpj,cadastro:'',valor:valor,
+      nfTorino:e.nf,tipoVenda:'LICITAÇÃO',custoAq:custoAq,
+      margem:margem,pctComissao:pct+'%',comissaoCalc:comissao,
+      dataReceb:'',_nova:true,_aberto:false
+    });
+  });
+
+  return {rows:rows, vendor:vendor, mesano:mesano, pct:pct};
+}
+
+async function gerarPlanilhaExcel() {
+  var result=montarDadosPlanilha();
+  if(!result||!result.rows.length){alert('Nenhuma NF para gerar. Verifique os filtros e o período.');return;}
+
+  // Usar SheetJS para gerar o Excel
+  var XLSX=window.XLSX;
+  if(!XLSX){alert('Biblioteca Excel não carregada. Aguarde e tente novamente.');return;}
+
+  var vendor=result.vendor;
+  var mesano=result.mesano;
+  var pct=result.pct;
+  var rows=result.rows;
+
+  // montar dados no formato da planilha
+  var titulo='Serviços '+vendor+' - '+mesano;
+  var header=['','Cliente','CNPJ','Cadastro','Valor','N/F TORINO','Tipo da venda',
+              'CUSTO AQUISIÇÃO','CUSTO COM LOGISTICO','CUSTO ADICIONAIS','CUSTO TOTAL',
+              'MARGEM','COMISSÃO APLICAVEL','COMISSÃO VENDAS','DATA RECEBIMENTO',''];
+  var wsData=[[titulo],...[header],...rows.map(function(r){
+    return ['',r.cliente,r.cnpj,r.cadastro,r.valor,r.nfTorino,r.tipoVenda,
+            r.custoAq,'','','',r.margem,r.pctComissao,r.comissaoCalc,r.dataReceb,''];
+  })];
+
+  var ws=XLSX.utils.aoa_to_sheet(wsData);
+
+  // larguras de coluna
+  ws['!cols']=[{wch:2},{wch:50},{wch:20},{wch:10},{wch:12},{wch:12},{wch:14},
+               {wch:16},{wch:18},{wch:16},{wch:12},{wch:10},{wch:18},{wch:16},{wch:20},{wch:2}];
+
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Plan1');
+  var nomeArq='PLANILHA_'+vendor.toUpperCase()+'_'+mesano.replace('-','_')+'.xlsx';
+  XLSX.writeFile(wb, nomeArq);
+  toast('Planilha gerada: '+nomeArq);
+}
+
+// ---- DASHBOARD ----
+function renderDashboard() {
+  var periodo=document.getElementById('dash-periodo').value;
+  var lista=comissoes.filter(function(c){return !periodo||c.mesano===periodo;});
+
+  document.getElementById('d-total-nfs').textContent=lista.length;
+  document.getElementById('d-liberadas').textContent=lista.filter(function(c){return c.statusNF==='liberada';}).length;
+  document.getElementById('d-aberto').textContent=lista.filter(function(c){return c.statusNF==='aberto';}).length;
+  var totalLib=lista.filter(function(c){return c.statusNF==='liberada';}).reduce(function(s,c){return s+c.comissaoLib;},0);
+  document.getElementById('d-comissao').textContent='R$ '+fmt(totalLib);
+
+  // por vendedor
+  var porVendedor={};
+  lista.forEach(function(c){
+    if(!porVendedor[c.vendedor])porVendedor[c.vendedor]={lib:0,total:0,nfs:0};
+    porVendedor[c.vendedor].nfs++;
+    porVendedor[c.vendedor].total+=c.comissaoCalc;
+    if(c.statusNF==='liberada')porVendedor[c.vendedor].lib+=c.comissaoLib;
+  });
+  var maxLib=Math.max.apply(null,Object.values(porVendedor).map(function(v){return v.lib;}));
+  var htmlV='';
+  Object.keys(porVendedor).sort().forEach(function(v){
+    var d=porVendedor[v];
+    var pct=maxLib>0?Math.round(d.lib/maxLib*100):0;
+    htmlV+='<div style="margin-bottom:10px">';
+    htmlV+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="font-weight:500">'+v+'</span><span>R$ '+fmt(d.lib)+' ('+d.nfs+' NFs)</span></div>';
+    htmlV+='<div class="bar-wrap"><div class="bar-fill" style="width:'+pct+'%;background:#1a56db"></div></div>';
+    htmlV+='</div>';
+  });
+  document.getElementById('dash-por-vendedor').innerHTML=htmlV||'<span style="color:#bbb;font-size:13px">Sem dados</span>';
+
+  // por status
+  var porStatus={liberada:0,aberto:0,cancelada:0,sem_retorno:0};
+  lista.forEach(function(c){if(porStatus[c.statusNF]!==undefined)porStatus[c.statusNF]++;});
+  var total=lista.length||1;
+  var statusLabels={liberada:'Liberada',aberto:'Em aberto',cancelada:'NF cancelada',sem_retorno:'Sem retorno'};
+  var statusColors={liberada:'#2e7d32',aberto:'#e65100',cancelada:'#c62828',sem_retorno:'#6a1b9a'};
+  var htmlS='';
+  Object.keys(porStatus).forEach(function(s){
+    var n=porStatus[s];
+    var pct=Math.round(n/total*100);
+    htmlS+='<div style="margin-bottom:10px">';
+    htmlS+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+statusLabels[s]+'</span><span>'+n+' ('+pct+'%)</span></div>';
+    htmlS+='<div class="bar-wrap"><div class="bar-fill" style="width:'+pct+'%;background:'+statusColors[s]+'"></div></div>';
+    htmlS+='</div>';
+  });
+  document.getElementById('dash-por-status').innerHTML=htmlS;
+
+  // por mês
+  var porMes={};
+  lista.forEach(function(c){
+    if(!porMes[c.mesano])porMes[c.mesano]={valor:0,comLib:0,nfs:0};
+    porMes[c.mesano].valor+=c.valor;
+    porMes[c.mesano].nfs++;
+    if(c.statusNF==='liberada')porMes[c.mesano].comLib+=c.comissaoLib;
+  });
+  var meses=Object.keys(porMes).sort();
+  var htmlM='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  htmlM+='<thead><tr><th style="text-align:left;padding:6px 8px;color:#999;border-bottom:1px solid #e8e8e4">Mês</th><th style="text-align:right;padding:6px 8px;color:#999;border-bottom:1px solid #e8e8e4">NFs</th><th style="text-align:right;padding:6px 8px;color:#999;border-bottom:1px solid #e8e8e4">Valor Total</th><th style="text-align:right;padding:6px 8px;color:#999;border-bottom:1px solid #e8e8e4">Comissão Liberada</th></tr></thead><tbody>';
+  meses.forEach(function(m){
+    var d=porMes[m];
+    htmlM+='<tr><td style="padding:6px 8px">'+m+'</td><td style="text-align:right;padding:6px 8px">'+d.nfs+'</td><td style="text-align:right;padding:6px 8px">R$ '+fmt(d.valor)+'</td><td style="text-align:right;padding:6px 8px;color:#2e7d32;font-weight:500">R$ '+fmt(d.comLib)+'</td></tr>';
+  });
+  htmlM+='</tbody></table>';
+  document.getElementById('dash-por-mes').innerHTML=meses.length?htmlM:'<span style="color:#bbb;font-size:13px">Sem dados</span>';
+}
+
+// ---- LEITOR DE XLSX ----
+function lerXLSX(file) {
+  return new Promise(function(res, rej) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        var XLSX = window.XLSX;
+        if(!XLSX) { rej(new Error('Biblioteca XLSX não carregada')); return; }
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, {type:'array', cellDates:true});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var json = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, dateNF:'yyyy-mm-dd'});
+        res(json);
+      } catch(err) { rej(err); }
+    };
+    reader.onerror = function() { rej(new Error('Falha ao ler arquivo')); };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 </script>
 </body>
 </html>
