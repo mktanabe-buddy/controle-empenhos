@@ -1563,17 +1563,22 @@ async function importarPlanilha(input) {
     html += '</div>';
 
     html += '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto"><table>';
-    html += '<thead><tr><th>Status</th><th>Cliente</th><th>NF Torino</th><th>Valor</th><th>% Com.</th><th>Com. Calc.</th><th>Com. Lib.</th><th>Data Receb.</th></tr></thead><tbody>';
+    html += '<thead><tr><th>Status</th><th>Cliente</th><th>CNPJ</th><th>Cadastro</th><th>NF Torino</th><th>Tipo</th><th>Valor</th><th>Custo Aq.</th><th>Margem</th><th>% Com.</th><th>Com. Calc.</th><th>Com. Lib.</th><th>Data Receb.</th></tr></thead><tbody>';
     rows.forEach(function(r){
       html += '<tr>';
       html += '<td>'+badgeComissao(r.statusNF)+'</td>';
-      html += '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.cliente+'</td>';
-      html += '<td>'+r.nfTorino+'</td>';
-      html += '<td>R$ '+fmt(r.valor)+'</td>';
+      html += '<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.cliente+'</td>';
+      html += '<td style="font-size:11px;white-space:nowrap">'+r.cnpj+'</td>';
+      html += '<td>'+r.cadastro+'</td>';
+      html += '<td style="font-weight:500">'+r.nfTorino+'</td>';
+      html += '<td style="font-size:11px">'+r.tipoVenda+'</td>';
+      html += '<td style="white-space:nowrap">R$ '+fmt(r.valor)+'</td>';
+      html += '<td style="white-space:nowrap">R$ '+fmt(r.custoAq)+'</td>';
+      html += '<td>'+(r.margem?(r.margem*100).toFixed(2)+'%':'-')+'</td>';
       html += '<td>'+r.pctComissao+'</td>';
-      html += '<td>R$ '+fmt(r.comissaoCalc)+'</td>';
-      html += '<td style="font-weight:'+(r.comissaoLib>0?'600':'400')+'">R$ '+fmt(r.comissaoLib)+'</td>';
-      html += '<td style="font-size:11px">'+r.dataReceb+'</td>';
+      html += '<td style="white-space:nowrap">R$ '+fmt(r.comissaoCalc)+'</td>';
+      html += '<td style="font-weight:'+(r.comissaoLib>0?'600':'400')+';white-space:nowrap">R$ '+fmt(r.comissaoLib)+'</td>';
+      html += '<td style="font-size:11px;white-space:nowrap">'+r.dataReceb+'</td>';
       html += '</tr>';
     });
     html += '</tbody></table></div></div>';
@@ -1636,12 +1641,6 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
   if(colMap.comissaoCalc<0) colMap.comissaoCalc=13;
   if(colMap.dataReceb<0) colMap.dataReceb=14;
 
-  // diagnóstico — mostrar o que foi mapeado
-  console.log('HeaderRow:', headerRow);
-  console.log('ColMap:', JSON.stringify(colMap));
-  console.log('Linha header raw:', JSON.stringify(data[headerRow]));
-  if(data[headerRow+1]) console.log('Linha dados raw:', JSON.stringify(data[headerRow+1]));
-
   // processar linhas de dados
   for(var i=headerRow+1;i<data.length;i++){
     var row=data[i]||[];
@@ -1663,15 +1662,15 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
     var valor=0;
     var vRaw=row[colMap.valor];
     if(vRaw!==undefined&&vRaw!==null){
-      var vStr=String(vRaw).replace(/[R$\s]/g,'').replace(',','.');
-      valor=parseFloat(vStr)||0;
+      if(typeof vRaw==='number'){valor=vRaw;}
+      else{var vStr=String(vRaw).replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.');valor=parseFloat(vStr)||0;}
     }
 
     var custoAq=0;
     var cRaw=row[colMap.custoAq];
     if(cRaw!==undefined&&cRaw!==null){
-      var cStr=String(cRaw).replace(/[R$\s]/g,'').replace(',','.');
-      custoAq=parseFloat(cStr)||0;
+      if(typeof cRaw==='number'){custoAq=cRaw;}
+      else{var cStr=String(cRaw).replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.');custoAq=parseFloat(cStr)||0;}
     }
 
     var margem=0;
@@ -1685,8 +1684,8 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
     var comissaoCalc=0;
     var ccRaw=row[colMap.comissaoCalc];
     if(ccRaw!==undefined&&ccRaw!==null){
-      var ccStr=String(ccRaw).replace(/[R$\s]/g,'').replace(',','.');
-      comissaoCalc=parseFloat(ccStr)||0;
+      if(typeof ccRaw==='number'){comissaoCalc=ccRaw;}
+      else{var ccStr=String(ccRaw).replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.');comissaoCalc=parseFloat(ccStr)||0;}
     }
 
     var pctCom=String(row[colMap.pctCom]||'2%').trim();
