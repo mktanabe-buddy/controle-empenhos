@@ -1489,7 +1489,7 @@ async function carregarComissoes() {
     comissoes = rows.slice(1).filter(function(r){return r[0];}).map(function(r){
       return {
         id:String(r[0]), planilhaId:String(r[1]||''), vendedor:String(r[2]||''),
-        mesano:String(r[3]||''), tipo:String(r[4]||''), statusPlanilha:String(r[5]||''),
+        mesano:normalizarMesAno(String(r[3]||'')), tipo:String(r[4]||''), statusPlanilha:String(r[5]||''),
         cliente:String(r[6]||''), cnpj:String(r[7]||''), cadastro:String(r[8]||''),
         valor:Number(r[9])||0, nfTorino:String(r[10]||''), tipoVenda:String(r[11]||''),
         custoAq:Number(r[12])||0, margem:Number(r[13])||0,
@@ -1592,6 +1592,15 @@ async function importarPlanilha(input) {
 function parsearMesAno(mes, ano) {
   var m = String(mes).padStart(2,'0');
   return ano+'-'+m;
+}
+
+function normalizarMesAno(mesano) {
+  if(!mesano) return mesano;
+  var s = String(mesano);
+  // se vier como timestamp ISO (ex: 2026-04-01T03:00:00.000Z)
+  var m = s.match(/^(\d{4})-(\d{2})/);
+  if(m) return m[1]+'-'+m[2];
+  return s;
 }
 
 function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
