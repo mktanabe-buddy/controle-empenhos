@@ -436,32 +436,83 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
 
     <!-- DASHBOARD -->
     <div id="com-dash" class="com-section" style="display:none">
-      <div class="metrics" style="grid-template-columns:repeat(4,1fr)">
+
+      <!-- Filtros globais -->
+      <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+        <div class="form-group" style="margin-bottom:0;min-width:160px">
+          <label>Período</label>
+          <select id="dash-periodo" onchange="renderDashboard()">
+            <option value="">Todo o histórico</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;min-width:160px">
+          <label>Vendedor</label>
+          <select id="dash-vendedor" onchange="renderDashboard()">
+            <option value="">Todos os vendedores</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- KPI cards -->
+      <div class="metrics" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
         <div class="metric"><div class="metric-val" id="d-total-nfs">0</div><div class="metric-lbl">Total de NFs</div></div>
         <div class="metric"><div class="metric-val" style="color:#2e7d32" id="d-liberadas">0</div><div class="metric-lbl">NFs liberadas</div></div>
         <div class="metric"><div class="metric-val" style="color:#e65100" id="d-aberto">0</div><div class="metric-lbl">Em aberto</div></div>
-        <div class="metric"><div class="metric-val" style="color:#1a56db" id="d-comissao">R$ 0</div><div class="metric-lbl">Comissão total paga</div></div>
+        <div class="metric"><div class="metric-val" style="color:#c62828" id="d-canceladas">0</div><div class="metric-lbl">NFs canceladas</div></div>
       </div>
-      <div class="form-group" style="margin-bottom:14px;max-width:200px">
-        <label>Filtrar por período</label>
-        <select id="dash-periodo" onchange="renderDashboard()">
-          <option value="">Todo o histórico</option>
-        </select>
+      <div class="metrics" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+        <div class="metric"><div class="metric-val" style="color:#1a56db" id="d-comissao">R$ 0</div><div class="metric-lbl">Comissão paga</div></div>
+        <div class="metric"><div class="metric-val" style="color:#7b5ea7" id="d-comissao-aberto">R$ 0</div><div class="metric-lbl">Comissão a liberar</div></div>
+        <div class="metric"><div class="metric-val" id="d-ticket-medio">R$ 0</div><div class="metric-lbl">Ticket médio (NF)</div></div>
+        <div class="metric"><div class="metric-val" id="d-margem-media">0%</div><div class="metric-lbl">Margem média</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-        <div class="card">
-          <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Comissão por vendedor</div>
-          <div id="dash-por-vendedor"></div>
+
+      <!-- Sub-abas Financeiro / Operacional -->
+      <div style="display:flex;gap:0;border-bottom:2px solid #e8e8e4;margin-bottom:16px">
+        <button id="dtab-fin" onclick="showDashTab('fin')" style="padding:7px 22px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:3px solid #1a56db;color:#1a56db;margin-bottom:-2px">Financeiro</button>
+        <button id="dtab-op" onclick="showDashTab('op')" style="padding:7px 22px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;color:#999;margin-bottom:-2px">Operacional</button>
+      </div>
+
+      <!-- ABA FINANCEIRO -->
+      <div id="dash-fin">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="card">
+            <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Comissão por vendedor</div>
+            <div id="dash-por-vendedor"></div>
+          </div>
+          <div class="card">
+            <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Tipo de venda</div>
+            <div id="dash-tipo-venda"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Evolução mensal — valor total das NFs</div>
+          <div id="dash-por-mes" style="overflow-x:auto"></div>
         </div>
         <div class="card">
-          <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">NFs por status</div>
-          <div id="dash-por-status"></div>
+          <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Vendas por estado (CNPJ)</div>
+          <div id="dash-por-estado"></div>
         </div>
       </div>
-      <div class="card">
-        <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Vendas por mês (valor total das NFs)</div>
-        <div id="dash-por-mes" style="overflow-x:auto"></div>
+
+      <!-- ABA OPERACIONAL -->
+      <div id="dash-op" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="card">
+            <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">NFs por status</div>
+            <div id="dash-por-status"></div>
+          </div>
+          <div class="card">
+            <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Em aberto por vendedor</div>
+            <div id="dash-aberto-vendedor"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;font-weight:600;color:#999;text-transform:uppercase;margin-bottom:10px">Ranking de clientes — valor total das NFs</div>
+          <div id="dash-ranking-clientes" style="overflow-x:auto"></div>
+        </div>
       </div>
+
     </div>
 
   </div>
@@ -2053,7 +2104,14 @@ function atualizarFiltrosBase() {
 
   var dp=document.getElementById('dash-periodo');
   var dpv=dp.value;
-  dp.innerHTML='<option value="">Todo o histórico</option>'+meses.map(function(m){return '<option value="'+m+'"'+(m===dpv?' selected':'')+'>'+m+'</option>';}).join('');
+  dp.innerHTML='<option value="">Todo o histórico</option>'+meses.map(function(m){return '<option value="'+m+'"'+(m===dpv?' selected':'')+'>'+mesAnoParaLabel(m)+'</option>';}).join('');
+
+  var dv=document.getElementById('dash-vendedor');
+  if(dv){
+    var dvv=dv.value;
+    var vendedores=[...new Set(comissoes.map(function(c){return c.vendedor;}).filter(Boolean))].sort();
+    dv.innerHTML='<option value="">Todos os vendedores</option>'+vendedores.map(function(v){return '<option value="'+v+'"'+(v===dvv?' selected':'')+'>'+v+'</option>';}).join('');
+  }
 }
 
 function renderBaseNFs() {
@@ -2225,70 +2283,242 @@ async function gerarPlanilhaExcel() {
 }
 
 // ---- DASHBOARD ----
+// Mapa CNPJ prefixo -> Estado
+var CNPJ_ESTADOS = {
+  '01':'AM','02':'PA','03':'AM','04':'RO','05':'RR','06':'AP','07':'TO',
+  '08':'MA','09':'PI','10':'CE','11':'RN','12':'PB','13':'PE','14':'AL',
+  '15':'SE','16':'BA','17':'MG','18':'ES','19':'RJ','20':'SP','21':'SP',
+  '22':'SP','23':'SP','24':'SP','25':'SP','26':'SP','27':'SP','28':'SP',
+  '29':'SP','30':'SP','31':'MG','32':'MG','33':'MG','34':'MG','35':'MG',
+  '36':'MG','37':'MG','38':'MG','39':'MG','40':'ES','41':'PR','42':'SC',
+  '43':'RS','44':'MS','45':'MT','46':'GO','47':'DF','48':'GO','49':'GO',
+  '50':'MS','51':'MT','52':'GO','53':'DF','54':'SP','55':'SP','56':'SP',
+  '57':'SP','58':'SP','59':'SP','60':'SP','61':'SP','62':'SP','63':'SP',
+  '64':'SP','65':'MT','66':'PA','67':'MS','68':'AC','69':'RR','70':'DF',
+  '71':'DF','72':'DF','73':'DF','74':'GO','75':'GO','76':'RO','77':'TO',
+  '78':'MT','79':'MS','80':'PR','81':'PR','82':'PR','83':'PR','84':'RN',
+  '85':'PR','86':'PR','87':'PR','88':'SC','89':'SC','90':'RS','91':'RS',
+  '92':'RS','93':'RS','94':'RS','95':'AM','96':'PA','97':'RO','98':'MA','99':'SP'
+};
+
+function cnpjParaEstado(cnpj) {
+  if(!cnpj) return 'N/D';
+  var s = String(cnpj).replace(/\D/g,'');
+  if(s.length < 2) return 'N/D';
+  return CNPJ_ESTADOS[s.substring(0,2)] || 'N/D';
+}
+
+function showDashTab(tab) {
+  document.getElementById('dash-fin').style.display = tab==='fin' ? '' : 'none';
+  document.getElementById('dash-op').style.display  = tab==='op'  ? '' : 'none';
+  document.getElementById('dtab-fin').style.borderBottomColor = tab==='fin' ? '#1a56db' : 'transparent';
+  document.getElementById('dtab-fin').style.color = tab==='fin' ? '#1a56db' : '#999';
+  document.getElementById('dtab-op').style.borderBottomColor  = tab==='op'  ? '#1a56db' : 'transparent';
+  document.getElementById('dtab-op').style.color  = tab==='op'  ? '#1a56db' : '#999';
+}
+
+function barHtml(label, valor, max, cor, sufixo) {
+  var pct = max>0 ? Math.round(valor/max*100) : 0;
+  return '<div style="margin-bottom:10px">'
+    +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'
+    +'<span style="font-weight:500">'+label+'</span><span>'+sufixo+'</span></div>'
+    +'<div class="bar-wrap"><div class="bar-fill" style="width:'+pct+'%;background:'+cor+'"></div></div>'
+    +'</div>';
+}
+
 function renderDashboard() {
-  var periodo=document.getElementById('dash-periodo').value;
-  var lista=comissoes.filter(function(c){return !periodo||c.mesano===periodo;});
+  var periodo  = document.getElementById('dash-periodo').value;
+  var vendedor = document.getElementById('dash-vendedor') ? document.getElementById('dash-vendedor').value : '';
+  var lista = comissoes.filter(function(c){
+    return (!periodo  || c.mesano===periodo)
+        && (!vendedor || c.vendedor===vendedor);
+  });
 
-  document.getElementById('d-total-nfs').textContent=lista.length;
-  document.getElementById('d-liberadas').textContent=lista.filter(function(c){return c.statusNF==='liberada';}).length;
-  document.getElementById('d-aberto').textContent=lista.filter(function(c){return c.statusNF==='aberto';}).length;
-  var totalLib=lista.filter(function(c){return c.statusNF==='liberada';}).reduce(function(s,c){return s+c.comissaoLib;},0);
-  document.getElementById('d-comissao').textContent='R$ '+fmt(totalLib);
+  // --- KPI cards ---
+  var nLib  = lista.filter(function(c){return c.statusNF==='liberada';}).length;
+  var nAberto = lista.filter(function(c){return c.statusNF==='aberto';}).length;
+  var nCanc = lista.filter(function(c){return c.statusNF==='cancelada';}).length;
+  var totalComLib   = lista.filter(function(c){return c.statusNF==='liberada';}).reduce(function(s,c){return s+c.comissaoLib;},0);
+  var totalComAberto= lista.filter(function(c){return c.statusNF!=='liberada'&&c.statusNF!=='cancelada';}).reduce(function(s,c){return s+c.comissaoCalc;},0);
+  var totalValor    = lista.reduce(function(s,c){return s+c.valor;},0);
+  var ticketMedio   = lista.length>0 ? totalValor/lista.length : 0;
+  var margensValidas= lista.filter(function(c){return c.margem>0;});
+  var margemMedia   = margensValidas.length>0 ? margensValidas.reduce(function(s,c){return s+c.margem;},0)/margensValidas.length : 0;
 
-  // por vendedor
+  document.getElementById('d-total-nfs').textContent       = lista.length;
+  document.getElementById('d-liberadas').textContent       = nLib;
+  document.getElementById('d-aberto').textContent          = nAberto;
+  document.getElementById('d-canceladas').textContent      = nCanc;
+  document.getElementById('d-comissao').textContent        = 'R$ '+fmt(totalComLib);
+  document.getElementById('d-comissao-aberto').textContent = 'R$ '+fmt(totalComAberto);
+  document.getElementById('d-ticket-medio').textContent    = 'R$ '+fmt(ticketMedio);
+  document.getElementById('d-margem-media').textContent    = (margemMedia*100).toFixed(1)+'%';
+
+  // ============================================================
+  // ABA FINANCEIRO
+  // ============================================================
+
+  // --- Comissão por vendedor ---
   var porVendedor={};
   lista.forEach(function(c){
-    if(!porVendedor[c.vendedor])porVendedor[c.vendedor]={lib:0,total:0,nfs:0};
+    if(!porVendedor[c.vendedor])porVendedor[c.vendedor]={lib:0,calc:0,nfs:0,valor:0};
     porVendedor[c.vendedor].nfs++;
-    porVendedor[c.vendedor].total+=c.comissaoCalc;
+    porVendedor[c.vendedor].valor+=c.valor;
+    porVendedor[c.vendedor].calc+=c.comissaoCalc;
     if(c.statusNF==='liberada')porVendedor[c.vendedor].lib+=c.comissaoLib;
   });
-  var maxLib=Math.max.apply(null,Object.values(porVendedor).map(function(v){return v.lib;}));
+  var maxLib=Math.max.apply(null,Object.values(porVendedor).map(function(v){return v.lib;})||[0]);
   var htmlV='';
-  Object.keys(porVendedor).sort().forEach(function(v){
+  Object.keys(porVendedor).sort(function(a,b){return porVendedor[b].lib-porVendedor[a].lib;}).forEach(function(v){
     var d=porVendedor[v];
-    var pct=maxLib>0?Math.round(d.lib/maxLib*100):0;
-    htmlV+='<div style="margin-bottom:10px">';
-    htmlV+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="font-weight:500">'+v+'</span><span>R$ '+fmt(d.lib)+' ('+d.nfs+' NFs)</span></div>';
-    htmlV+='<div class="bar-wrap"><div class="bar-fill" style="width:'+pct+'%;background:#1a56db"></div></div>';
-    htmlV+='</div>';
+    htmlV+=barHtml(v, d.lib, maxLib, '#1a56db', 'R$ '+fmt(d.lib)+' liberado | R$ '+fmt(d.calc)+' calc. ('+d.nfs+' NFs)');
   });
   document.getElementById('dash-por-vendedor').innerHTML=htmlV||'<span style="color:#bbb;font-size:13px">Sem dados</span>';
 
-  // por status
-  var porStatus={liberada:0,aberto:0,cancelada:0,sem_retorno:0};
-  lista.forEach(function(c){if(porStatus[c.statusNF]!==undefined)porStatus[c.statusNF]++;});
-  var total=lista.length||1;
-  var statusLabels={liberada:'Liberada',aberto:'Em aberto',cancelada:'NF cancelada',sem_retorno:'Sem retorno'};
-  var statusColors={liberada:'#2e7d32',aberto:'#e65100',cancelada:'#c62828',sem_retorno:'#6a1b9a'};
-  var htmlS='';
-  Object.keys(porStatus).forEach(function(s){
-    var n=porStatus[s];
-    var pct=Math.round(n/total*100);
-    htmlS+='<div style="margin-bottom:10px">';
-    htmlS+='<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+statusLabels[s]+'</span><span>'+n+' ('+pct+'%)</span></div>';
-    htmlS+='<div class="bar-wrap"><div class="bar-fill" style="width:'+pct+'%;background:'+statusColors[s]+'"></div></div>';
-    htmlS+='</div>';
+  // --- Tipo de venda ---
+  var porTipo={};
+  lista.forEach(function(c){
+    var t=c.tipoVenda||'Não informado';
+    if(!porTipo[t])porTipo[t]={valor:0,nfs:0,comLib:0};
+    porTipo[t].valor+=c.valor; porTipo[t].nfs++; porTipo[t].comLib+=c.comissaoLib;
   });
-  document.getElementById('dash-por-status').innerHTML=htmlS;
+  var maxTipo=Math.max.apply(null,Object.values(porTipo).map(function(v){return v.valor;})||[0]);
+  var coresTipo=['#1a56db','#2e7d32','#e65100','#7b5ea7','#c62828'];
+  var htmlTipo=''; var idx=0;
+  Object.keys(porTipo).sort(function(a,b){return porTipo[b].valor-porTipo[a].valor;}).forEach(function(t){
+    var d=porTipo[t]; var cor=coresTipo[idx%coresTipo.length]; idx++;
+    htmlTipo+=barHtml(t, d.valor, maxTipo, cor, 'R$ '+fmt(d.valor)+' ('+d.nfs+' NFs)');
+  });
+  document.getElementById('dash-tipo-venda').innerHTML=htmlTipo||'<span style="color:#bbb;font-size:13px">Sem dados</span>';
 
-  // por mês
+  // --- Evolução mensal ---
   var porMes={};
   lista.forEach(function(c){
-    if(!porMes[c.mesano])porMes[c.mesano]={valor:0,comLib:0,nfs:0};
-    porMes[c.mesano].valor+=c.valor;
-    porMes[c.mesano].nfs++;
+    if(!porMes[c.mesano])porMes[c.mesano]={valor:0,comLib:0,comCalc:0,nfs:0};
+    porMes[c.mesano].valor+=c.valor; porMes[c.mesano].nfs++;
+    porMes[c.mesano].comCalc+=c.comissaoCalc;
     if(c.statusNF==='liberada')porMes[c.mesano].comLib+=c.comissaoLib;
   });
   var meses=Object.keys(porMes).sort();
   var htmlM='<table style="width:100%;border-collapse:collapse;font-size:12px">';
-  htmlM+='<thead><tr><th style="text-align:left;padding:6px 8px;color:#999;border-bottom:1px solid #e8e8e4">Mês</th><th style="text-align:right;padding:6px 8px;color:#999;border-bottom:1px solid #e8e8e4">NFs</th><th style="text-align:right;padding:6px 8px;color:#999;border-bottom:1px solid #e8e8e4">Valor Total</th><th style="text-align:right;padding:6px 8px;color:#999;border-bottom:1px solid #e8e8e4">Comissão Liberada</th></tr></thead><tbody>';
+  htmlM+='<thead><tr>'
+    +'<th style="text-align:left;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">Mês</th>'
+    +'<th style="text-align:right;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">NFs</th>'
+    +'<th style="text-align:right;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">Valor total</th>'
+    +'<th style="text-align:right;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">Comissão calc.</th>'
+    +'<th style="text-align:right;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">Comissão liberada</th>'
+    +'</tr></thead><tbody>';
   meses.forEach(function(m){
     var d=porMes[m];
-    htmlM+='<tr><td style="padding:6px 8px">'+m+'</td><td style="text-align:right;padding:6px 8px">'+d.nfs+'</td><td style="text-align:right;padding:6px 8px">R$ '+fmt(d.valor)+'</td><td style="text-align:right;padding:6px 8px;color:#2e7d32;font-weight:500">R$ '+fmt(d.comLib)+'</td></tr>';
+    htmlM+='<tr style="border-bottom:1px solid #f5f5f0">'
+      +'<td style="padding:7px 8px;font-weight:500">'+mesAnoParaLabel(m)+'</td>'
+      +'<td style="text-align:right;padding:7px 8px">'+d.nfs+'</td>'
+      +'<td style="text-align:right;padding:7px 8px">R$ '+fmt(d.valor)+'</td>'
+      +'<td style="text-align:right;padding:7px 8px;color:#7b5ea7">R$ '+fmt(d.comCalc)+'</td>'
+      +'<td style="text-align:right;padding:7px 8px;color:#2e7d32;font-weight:500">R$ '+fmt(d.comLib)+'</td>'
+      +'</tr>';
   });
+  // linha de total
+  var totValor=meses.reduce(function(s,m){return s+porMes[m].valor;},0);
+  var totCalc=meses.reduce(function(s,m){return s+porMes[m].comCalc;},0);
+  var totLib=meses.reduce(function(s,m){return s+porMes[m].comLib;},0);
+  var totNfs=meses.reduce(function(s,m){return s+porMes[m].nfs;},0);
+  htmlM+='<tr style="background:#f5f5f0;font-weight:600">'
+    +'<td style="padding:7px 8px">Total</td>'
+    +'<td style="text-align:right;padding:7px 8px">'+totNfs+'</td>'
+    +'<td style="text-align:right;padding:7px 8px">R$ '+fmt(totValor)+'</td>'
+    +'<td style="text-align:right;padding:7px 8px;color:#7b5ea7">R$ '+fmt(totCalc)+'</td>'
+    +'<td style="text-align:right;padding:7px 8px;color:#2e7d32">R$ '+fmt(totLib)+'</td>'
+    +'</tr>';
   htmlM+='</tbody></table>';
   document.getElementById('dash-por-mes').innerHTML=meses.length?htmlM:'<span style="color:#bbb;font-size:13px">Sem dados</span>';
+
+  // --- Por estado ---
+  var porEstado={};
+  lista.forEach(function(c){
+    var uf=cnpjParaEstado(c.cnpj);
+    if(!porEstado[uf])porEstado[uf]={valor:0,nfs:0};
+    porEstado[uf].valor+=c.valor; porEstado[uf].nfs++;
+  });
+  var maxEst=Math.max.apply(null,Object.values(porEstado).map(function(v){return v.valor;})||[0]);
+  var estadosOrdenados=Object.keys(porEstado).sort(function(a,b){return porEstado[b].valor-porEstado[a].valor;});
+  var htmlE='<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">';
+  estadosOrdenados.forEach(function(uf){
+    var d=porEstado[uf];
+    htmlE+=barHtml(uf, d.valor, maxEst, '#1a56db', 'R$ '+fmt(d.valor)+' ('+d.nfs+' NFs)');
+  });
+  htmlE+='</div>';
+  document.getElementById('dash-por-estado').innerHTML=estadosOrdenados.length?htmlE:'<span style="color:#bbb;font-size:13px">Sem dados</span>';
+
+  // ============================================================
+  // ABA OPERACIONAL
+  // ============================================================
+
+  // --- NFs por status ---
+  var porStatus={liberada:0,aberto:0,cancelada:0,sem_retorno:0};
+  lista.forEach(function(c){if(porStatus[c.statusNF]!==undefined)porStatus[c.statusNF]++;});
+  var totalS=lista.length||1;
+  var statusLabels={liberada:'Liberada',aberto:'Em aberto',cancelada:'NF cancelada',sem_retorno:'Sem retorno'};
+  var statusColors={liberada:'#2e7d32',aberto:'#e65100',cancelada:'#c62828',sem_retorno:'#9e9e9e'};
+  var htmlS='';
+  Object.keys(porStatus).forEach(function(s){
+    var n=porStatus[s]; var pct=Math.round(n/totalS*100);
+    htmlS+=barHtml(statusLabels[s], n, totalS, statusColors[s], n+' ('+pct+'%)');
+  });
+  document.getElementById('dash-por-status').innerHTML=htmlS;
+
+  // --- Em aberto por vendedor ---
+  var abertoVendedor={};
+  lista.filter(function(c){return c.statusNF==='aberto';}).forEach(function(c){
+    if(!abertoVendedor[c.vendedor])abertoVendedor[c.vendedor]={valor:0,nfs:0,comCalc:0};
+    abertoVendedor[c.vendedor].valor+=c.valor;
+    abertoVendedor[c.vendedor].nfs++;
+    abertoVendedor[c.vendedor].comCalc+=c.comissaoCalc;
+  });
+  var maxAb=Math.max.apply(null,Object.values(abertoVendedor).map(function(v){return v.valor;})||[0]);
+  var htmlAb='';
+  Object.keys(abertoVendedor).sort(function(a,b){return abertoVendedor[b].valor-abertoVendedor[a].valor;}).forEach(function(v){
+    var d=abertoVendedor[v];
+    htmlAb+=barHtml(v, d.valor, maxAb, '#e65100', 'R$ '+fmt(d.valor)+' | comissão: R$ '+fmt(d.comCalc)+' ('+d.nfs+' NFs)');
+  });
+  document.getElementById('dash-aberto-vendedor').innerHTML=htmlAb||'<span style="color:#bbb;font-size:13px">Nenhuma NF em aberto</span>';
+
+  // --- Ranking clientes ---
+  var porCliente={};
+  lista.forEach(function(c){
+    var key=c.cnpj||c.cliente;
+    if(!porCliente[key])porCliente[key]={nome:c.cliente,cnpj:c.cnpj,valor:0,nfs:0,comLib:0,vendedores:{}};
+    porCliente[key].valor+=c.valor; porCliente[key].nfs++;
+    if(c.statusNF==='liberada')porCliente[key].comLib+=c.comissaoLib;
+    porCliente[key].vendedores[c.vendedor]=1;
+    if(c.cliente&&c.cliente.length>(porCliente[key].nome||'').length) porCliente[key].nome=c.cliente;
+  });
+  var clientes=Object.values(porCliente).sort(function(a,b){return b.valor-a.valor;}).slice(0,20);
+  var htmlC='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  htmlC+='<thead><tr>'
+    +'<th style="text-align:left;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">#</th>'
+    +'<th style="text-align:left;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">Cliente</th>'
+    +'<th style="text-align:left;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">UF</th>'
+    +'<th style="text-align:left;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">Vendedor(es)</th>'
+    +'<th style="text-align:right;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">NFs</th>'
+    +'<th style="text-align:right;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">Valor total</th>'
+    +'<th style="text-align:right;padding:7px 8px;color:#999;border-bottom:1px solid #e8e8e4">Comissão lib.</th>'
+    +'</tr></thead><tbody>';
+  clientes.forEach(function(c,i){
+    var uf=cnpjParaEstado(c.cnpj);
+    var vends=Object.keys(c.vendedores).join(', ');
+    htmlC+='<tr style="border-bottom:1px solid #f5f5f0'+(i%2===0?';background:#fafaf8':'') +'">'
+      +'<td style="padding:7px 8px;color:#999;font-weight:600">'+(i+1)+'</td>'
+      +'<td style="padding:7px 8px;font-weight:500">'+c.nome+'</td>'
+      +'<td style="padding:7px 8px"><span style="background:#e8e8e4;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600">'+uf+'</span></td>'
+      +'<td style="padding:7px 8px;color:#666">'+vends+'</td>'
+      +'<td style="text-align:right;padding:7px 8px">'+c.nfs+'</td>'
+      +'<td style="text-align:right;padding:7px 8px;font-weight:500">R$ '+fmt(c.valor)+'</td>'
+      +'<td style="text-align:right;padding:7px 8px;color:#2e7d32;font-weight:500">R$ '+fmt(c.comLib)+'</td>'
+      +'</tr>';
+  });
+  htmlC+='</tbody></table>';
+  document.getElementById('dash-ranking-clientes').innerHTML=clientes.length?htmlC:'<span style="color:#bbb;font-size:13px">Sem dados</span>';
 }
 
 // ---- LEITOR DE XLSX ----
