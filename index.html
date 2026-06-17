@@ -372,7 +372,7 @@ input.required-empty{border-color:#c62828;background:#fff8f8}
               <th>Status</th><th>Vendedor</th><th>Mês ref.</th><th>Cliente</th><th>CNPJ</th>
               <th>NF Torino</th><th>Valor</th><th>Custo Aq.</th><th>Margem</th>
               <th>% Comissão</th><th>Comissão calc.</th><th>Comissão lib.</th>
-              <th>Data receb.</th><th>Tipo venda</th><th>Planilha</th>
+              <th>Data receb.</th><th>Tipo venda</th><th>Liberada em</th>
             </tr></thead>
             <tbody id="tb-base-nfs"></tbody>
           </table>
@@ -1557,10 +1557,20 @@ async function importarPlanilha(input) {
 
     statusEl.innerHTML='<div class="ai-box" style="background:#e8f5e9;color:#2e7d32"><i class="ti ti-check"></i> '+rows.length+' NFs lidas com sucesso!</div>';
 
-    var html = '<div class="form-grid-3" style="gap:10px;margin-bottom:12px">';
+    var totalValor=rows.reduce(function(s,r){return s+(r.valor||0);},0);
+    var totalComCalc=rows.reduce(function(s,r){return s+(r.comissaoCalc||0);},0);
+    var margens=rows.filter(function(r){return r.margem>0;});
+    var mediaMargem=margens.length?margens.reduce(function(s,r){return s+r.margem;},0)/margens.length:0;
+
+    var html = '<div class="form-grid-3" style="gap:10px;margin-bottom:10px">';
     html += '<div class="metric"><div class="metric-val" style="color:#2e7d32">'+liberadas.length+'</div><div class="metric-lbl">Liberadas</div></div>';
     html += '<div class="metric"><div class="metric-val" style="color:#e65100">'+emAberto.length+'</div><div class="metric-lbl">Em aberto</div></div>';
     html += '<div class="metric"><div class="metric-val" style="color:#c62828">'+canceladas.length+'</div><div class="metric-lbl">NF cancelada</div></div>';
+    html += '</div>';
+    html += '<div class="form-grid-3" style="gap:10px;margin-bottom:12px">';
+    html += '<div class="metric"><div class="metric-val" style="font-size:16px">R$ '+fmt(totalValor)+'</div><div class="metric-lbl">Valor total das NFs</div></div>';
+    html += '<div class="metric"><div class="metric-val" style="font-size:16px;color:#1a56db">R$ '+fmt(totalComCalc)+'</div><div class="metric-lbl">Comissão estimada</div></div>';
+    html += '<div class="metric"><div class="metric-val" style="font-size:16px;color:#6a1b9a">'+(mediaMargem*100).toFixed(2)+'%</div><div class="metric-lbl">Margem média</div></div>';
     html += '</div>';
 
     html += '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto"><table>';
@@ -1730,21 +1740,26 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
   if(tipo==='devolvida'){
     for(var i=headerRow+1;i<data.length;i++){
       var row=data[i]||[];
-      var cliStr=String(row[cm.cliente]||'').trim().toUpperCase();
-      // detectar linha TOTAL
-      if(cliStr==='TOTAL'||cliStr.startsWith('TOTAL')){
+      // buscar TOTAL em QUALQUER coluna da linha
+      var temTotal=false;
+      for(var j=0;j<row.length;j++){
+        if(String(row[j]||'').trim().toUpperCase()==='TOTAL'){temTotal=true;break;}
+      }
+      if(temTotal){
         bloco1End=i;
-        console.log('[Parser] TOTAL linha',i,'->',bloco1End-headerRow-1,'NFs liberadas');
+        console.log('[Parser] TOTAL na linha',i,'col',j,'->',bloco1End-headerRow-1,'NFs liberadas');
         break;
       }
     }
-    // fallback: linha vazia
+    // fallback: linha vazia (sem cliente E sem NF)
     if(bloco1End<0){
       for(var i=headerRow+1;i<data.length;i++){
         var row=data[i]||[];
         var cliStr=String(row[cm.cliente]||'').trim();
         var nfStr=cm.nf>=0?String(row[cm.nf]||'').trim():'';
-        if((!cliStr||cliStr==='nan')&&(!nfStr||nfStr==='nan')){
+        var cliVazio=!cliStr||cliStr===''||cliStr==='nan'||cliStr==='undefined';
+        var nfVazio=!nfStr||nfStr===''||nfStr==='nan'||nfStr==='undefined';
+        if(cliVazio&&nfVazio){
           bloco1End=i;
           console.log('[Parser] linha vazia',i,'->',bloco1End-headerRow-1,'NFs liberadas');
           break;
@@ -1844,19 +1859,74 @@ async function confirmarImportacao() {
   if(!dadosParaImportar||!dadosParaImportar.length) return;
   var btn=document.getElementById('btn-confirmar-imp');
   btn.disabled=true; btn.textContent='Salvando...';
+  var tipo=document.getElementById('imp-tipo').value;
   try {
-    var batchRows = dadosParaImportar.map(function(r){
-      return [r.id,r.planilhaId,r.vendedor,r.mesano,r.tipo,r.statusPlanilha,
-              r.cliente,r.cnpj,r.cadastro,r.valor,r.nfTorino,r.tipoVenda,
-              r.custoAq,r.margem,r.pctComissao,r.comissaoCalc,r.comissaoLib,
-              r.dataReceb,r.statusNF,r.planilhaLib||'',r.importadoEm];
-    });
-    // enviar em lotes de 50
-    for(var i=0;i<batchRows.length;i+=50){
-      var batch=batchRows.slice(i,i+50);
-      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'saveComissaoBatch',rows:batch})});
+    var novas=[];
+    var atualizacoes=[];
+
+    if(tipo==='devolvida'){
+      // para cada NF da devolvida, verificar se já existe na base (mesma NF Torino + mesmo vendedor)
+      dadosParaImportar.forEach(function(r){
+        var existente=comissoes.find(function(c){
+          return String(c.nfTorino)===String(r.nfTorino) &&
+                 c.vendedor===r.vendedor &&
+                 c.mesano===r.mesano;
+        });
+        if(existente && existente.statusNF!=='liberada'){
+          // atualizar status da NF existente
+          atualizacoes.push({
+            id: existente.id,
+            statusNF: r.statusNF,
+            comissaoLib: r.comissaoLib,
+            planilhaLib: r.planilhaLib,
+            dataReceb: r.dataReceb
+          });
+        } else if(!existente){
+          // NF nova — inserir
+          novas.push(r);
+        }
+        // se existente e já liberada: ignorar (não duplicar)
+      });
+      console.log('[Import] Devolvida: '+novas.length+' novas, '+atualizacoes.length+' atualizações, '+(dadosParaImportar.length-novas.length-atualizacoes.length)+' ignoradas (já liberadas)');
+    } else {
+      // planilha enviada: inserir todas
+      novas = dadosParaImportar;
     }
-    toast(dadosParaImportar.length+' NFs importadas!');
+
+    // salvar novas em batch
+    if(novas.length){
+      var batchRows=novas.map(function(r){
+        return [r.id,r.planilhaId,r.vendedor,r.mesano,r.tipo,r.statusPlanilha,
+                r.cliente,r.cnpj,r.cadastro,r.valor,r.nfTorino,r.tipoVenda,
+                r.custoAq,r.margem,r.pctComissao,r.comissaoCalc,r.comissaoLib,
+                r.dataReceb,r.statusNF,r.planilhaLib||'',r.importadoEm];
+      });
+      for(var i=0;i<batchRows.length;i+=50){
+        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'saveComissaoBatch',rows:batchRows.slice(i,i+50)})});
+      }
+    }
+
+    // atualizar registros existentes
+    if(atualizacoes.length){
+      for(var i=0;i<atualizacoes.length;i++){
+        var at=atualizacoes[i];
+        var updates=[
+          {id:at.id,col:18,val:at.statusNF},
+          {id:at.id,col:16,val:at.comissaoLib},
+          {id:at.id,col:19,val:at.planilhaLib},
+          {id:at.id,col:17,val:at.dataReceb}
+        ];
+        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'updateComissao',updates:updates})});
+      }
+    }
+
+    var msg='';
+    if(tipo==='devolvida'){
+      msg=atualizacoes.length+' NFs atualizadas, '+novas.length+' novas inseridas.';
+    }else{
+      msg=novas.length+' NFs importadas!';
+    }
+    toast(msg);
     dadosParaImportar=null;
     document.getElementById('imp-preview').innerHTML='';
     document.getElementById('imp-status').style.display='none';
