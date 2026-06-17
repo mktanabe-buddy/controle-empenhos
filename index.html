@@ -1605,8 +1605,17 @@ function normalizarMesAno(mesano) {
 
 function normalizarData(val) {
   if(!val) return '';
+  // número serial do Excel (raw:true) — converter para data
+  if(typeof val==='number' && val>40000 && val<60000){
+    var d = new Date(Math.round((val - 25569)*86400*1000));
+    var dd = String(d.getUTCDate()).padStart(2,'0');
+    var mm = String(d.getUTCMonth()+1).padStart(2,'0');
+    var yyyy = d.getUTCFullYear();
+    return dd+'/'+mm+'/'+yyyy;
+  }
   var s = String(val).trim();
   if(!s || s==='nan' || s==='undefined') return '';
+  // timestamp ISO
   var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(m) return m[3]+'/'+m[2]+'/'+m[1];
   return s;
@@ -2174,7 +2183,7 @@ function lerXLSX(file) {
         var data = new Uint8Array(e.target.result);
         var wb = XLSX.read(data, {type:'array', cellDates:true});
         var ws = wb.Sheets[wb.SheetNames[0]];
-        var json = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, dateNF:'yyyy-mm-dd'});
+        var json = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, dateNF:'yyyy-mm-dd'});
         res(json);
       } catch(err) { rej(err); }
     };
