@@ -1567,11 +1567,17 @@ async function importarPlanilha(input) {
     html += '<div class="metric"><div class="metric-val" style="color:#e65100">'+emAberto.length+'</div><div class="metric-lbl">Em aberto</div></div>';
     html += '<div class="metric"><div class="metric-val" style="color:#c62828">'+canceladas.length+'</div><div class="metric-lbl">NF cancelada</div></div>';
     html += '</div>';
-    html += '<div class="form-grid-3" style="gap:10px;margin-bottom:12px">';
+    var totalComLib2=rows.reduce(function(s,r){return s+(r.comissaoLib||0);},0);
+    html += '<div class="form-grid-3" style="gap:10px;margin-bottom:10px">';
     html += '<div class="metric"><div class="metric-val" style="font-size:16px">R$ '+fmt(totalValor)+'</div><div class="metric-lbl">Valor total das NFs</div></div>';
     html += '<div class="metric"><div class="metric-val" style="font-size:16px;color:#1a56db">R$ '+fmt(totalComCalc)+'</div><div class="metric-lbl">Comissão estimada</div></div>';
     html += '<div class="metric"><div class="metric-val" style="font-size:16px;color:#6a1b9a">'+(mediaMargem*100).toFixed(2)+'%</div><div class="metric-lbl">Margem média</div></div>';
     html += '</div>';
+    if(totalComLib2>0){
+      html += '<div class="form-grid-3" style="gap:10px;margin-bottom:12px">';
+      html += '<div class="metric" style="border-color:#a5d6a7;background:#f9fff9"><div class="metric-val" style="font-size:16px;color:#2e7d32">R$ '+fmt(totalComLib2)+'</div><div class="metric-lbl">Comissão liberada (bloco 1)</div></div>';
+      html += '</div>';
+    }
 
     html += '<div class="card" style="padding:0;overflow:hidden"><div style="overflow-x:auto"><table>';
     html += '<thead><tr><th>Status</th><th>Cliente</th><th>CNPJ</th><th>Cadastro</th><th>NF Torino</th><th>Tipo</th><th>Valor</th><th>Custo Aq.</th><th>Margem</th><th>% Com.</th><th>Com. Calc.</th><th>Com. Lib.</th><th>Data Receb.</th></tr></thead><tbody>';
