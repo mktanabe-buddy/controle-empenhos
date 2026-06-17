@@ -1906,18 +1906,17 @@ async function confirmarImportacao() {
       }
     }
 
-    // atualizar registros existentes
+    // atualizar registros existentes em batch (uma chamada)
     if(atualizacoes.length){
-      for(var i=0;i<atualizacoes.length;i++){
-        var at=atualizacoes[i];
-        var updates=[
-          {id:at.id,col:18,val:at.statusNF},
-          {id:at.id,col:16,val:at.comissaoLib},
-          {id:at.id,col:19,val:at.planilhaLib},
-          {id:at.id,col:17,val:at.dataReceb}
-        ];
-        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'updateComissao',updates:updates})});
-      }
+      var batchUpd=atualizacoes.map(function(at){
+        return{id:at.id,fields:[
+          {col:18,val:at.statusNF},
+          {col:16,val:at.comissaoLib},
+          {col:19,val:at.planilhaLib},
+          {col:17,val:at.dataReceb}
+        ]};
+      });
+      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'updateComissaoBatch',updates:batchUpd})});
     }
 
     var msg='';
@@ -1987,39 +1986,34 @@ function excluirImportacaoPorIdx(gi){
 async function excluirImportacao(planilhaId) {
   if(!confirm('Excluir esta importação?')) return;
   try {
-    // identificar tipo da planilha
     var grupo=window._impLista?window._impLista.find(function(g){return g.planilhaId===planilhaId;}):null;
     var tipo=grupo?grupo.tipo:'enviada';
 
     if(tipo==='devolvida'){
-      // reverter status das NFs que foram atualizadas por esta planilha
+      // 1. reverter status em batch (uma única chamada)
       var atualizadas=comissoes.filter(function(c){return c.planilhaLib===grupo.mesano&&c.vendedor===grupo.vendedor;});
-      for(var i=0;i<atualizadas.length;i++){
-        var at=atualizadas[i];
-        var updates=[
-          {id:at.id,col:18,val:'sem_retorno'},
-          {id:at.id,col:16,val:0},
-          {id:at.id,col:19,val:''}
-        ];
-        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'updateComissao',updates:updates})});
+      if(atualizadas.length){
+        var batchUpdates=atualizadas.map(function(at){
+          return{id:at.id,fields:[{col:18,val:'sem_retorno'},{col:16,val:0},{col:19,val:''}]};
+        });
+        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'updateComissaoBatch',updates:batchUpdates})});
       }
-      // excluir apenas NFs novas (inseridas pela devolvida, não existiam na enviada)
+      // 2. excluir NFs novas em batch
       var novas=comissoes.filter(function(c){return c.planilhaId===planilhaId;});
-      for(var i=0;i<novas.length;i++){
-        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissao',id:novas[i].id})});
+      if(novas.length){
+        var ids=novas.map(function(c){return c.id;});
+        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissaoBatch',ids:ids})});
       }
-      toast('Importação revertida: '+atualizadas.length+' NFs voltaram para sem_retorno.');
+      toast('Importação revertida: '+atualizadas.length+' NFs voltaram para sem retorno.');
     } else {
-      // enviada: excluir todos os registros
+      // enviada: excluir todos em batch
       var ids=comissoes.filter(function(c){return String(c.planilhaId)===String(planilhaId);}).map(function(c){return c.id;});
       if(!ids.length){alert('Nenhum registro encontrado.');return;}
-      for(var i=0;i<ids.length;i++){
-        await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissao',id:ids[i]})});
-      }
+      await fetch(WEB_APP,{method:'POST',body:JSON.stringify({action:'deleteComissaoBatch',ids:ids})});
       toast(ids.length+' registros excluídos.');
     }
     await carregarComissoes();
-  } catch(e) { alert('Erro: '+e.message); }
+  } catch(e){alert('Erro: '+e.message);}
 }
 
 // ---- BASE DE NFs ----
