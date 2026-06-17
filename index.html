@@ -1605,26 +1605,37 @@ function normalizarMesAno(mesano) {
 
 function normalizarData(val) {
   if(!val) return '';
-  // objeto Date do JS (SheetJS raw:true retorna Date para células de data)
-  if(val instanceof Date){
-    var dd=String(val.getDate()).padStart(2,'0');
-    var mm=String(val.getMonth()+1).padStart(2,'0');
-    var aa=String(val.getFullYear()).slice(-2);
-    return dd+'/'+mm+'/'+aa;
-  }
+  var d=null;
+  // objeto Date do JS
+  if(val instanceof Date){ d=val; }
   // número serial do Excel
-  if(typeof val==='number' && val>40000 && val<60000){
-    var d=new Date(Math.round((val-25569)*86400*1000));
-    var dd=String(d.getUTCDate()).padStart(2,'0');
-    var mm=String(d.getUTCMonth()+1).padStart(2,'0');
-    var aa=String(d.getUTCFullYear()).slice(-2);
+  else if(typeof val==='number' && val>40000 && val<60000){
+    d=new Date(Math.round((val-25569)*86400*1000));
+    var dd2=String(d.getUTCDate()).padStart(2,'0');
+    var mm2=String(d.getUTCMonth()+1).padStart(2,'0');
+    var aa2=String(d.getUTCFullYear()).slice(-2);
+    return dd2+'/'+mm2+'/'+aa2;
+  }
+  if(d){
+    var dd=String(d.getDate()).padStart(2,'0');
+    var mm=String(d.getMonth()+1).padStart(2,'0');
+    var aa=String(d.getFullYear()).slice(-2);
     return dd+'/'+mm+'/'+aa;
   }
   var s=String(val).trim();
   if(!s||s==='nan'||s==='undefined') return '';
-  // timestamp ISO
-  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(m) return m[3]+'/'+m[2]+'/'+String(m[1]).slice(-2);
+  // string de data longa do JS: "Fri May 08 2026 00:00:28 GMT-0300..."
+  var mLong=s.match(/(\w+)\s+(\w+)\s+(\d{2})\s+(\d{4})/);
+  if(mLong){
+    var meses={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',
+               Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+    var mm3=meses[mLong[2]]||'01';
+    var aa3=String(mLong[4]).slice(-2);
+    return mLong[3]+'/'+mm3+'/'+aa3;
+  }
+  // ISO YYYY-MM-DD
+  var mISO=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(mISO) return mISO[3]+'/'+mISO[2]+'/'+String(mISO[1]).slice(-2);
   return s;
 }
 
