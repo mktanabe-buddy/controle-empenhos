@@ -1496,7 +1496,7 @@ async function carregarComissoes() {
         pctComissao:(function(v){var s=String(v||'2%').trim();if(s.includes('%'))return s;var n=parseFloat(s);return(!isNaN(n)?(n>1?n:n*100).toFixed(0)+'%':'2%');})(r[14]),
         comissaoCalc:Number(r[15])||0,
         comissaoLib:Number(r[16])||0, dataReceb:normalizarData(String(r[17]||'')),
-        statusNF:String(r[18]||''), planilhaLib:String(r[19]||''), importadoEm:String(r[20]||'')
+        statusNF:String(r[18]||''), planilhaLib:mesAnoParaLabel(String(r[19]||'')), importadoEm:String(r[20]||'')
       };
     });
     renderImportacoes();
@@ -1616,6 +1616,21 @@ function normalizarMesAno(mesano) {
   var s = String(mesano);
   var m = s.match(/^(\d{4})-(\d{2})/);
   if(m) return m[1]+'-'+m[2];
+  return s;
+}
+
+function mesAnoParaLabel(mesano) {
+  // Converte '2026-04' ou '2026-04-01T03:00:00.000Z' para 'Abr/26'
+  if(!mesano) return '';
+  var s = String(mesano);
+  var nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var m = s.match(/^(\d{4})-(\d{2})/);
+  if(m) {
+    var ano = m[1].slice(-2);
+    var mes = parseInt(m[2], 10);
+    return nomes[mes-1]+'/'+ano;
+  }
+  // já está no formato Abr/26
   return s;
 }
 
@@ -1853,7 +1868,7 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
       comissaoLib: comissaoLib,
       dataReceb: dataReceb,
       statusNF: statusNF,
-      planilhaLib: statusNF==='liberada'?mesano:'',
+      planilhaLib: statusNF==='liberada'?mesAnoParaLabel(mesano):'',
       importadoEm: new Date().toISOString()
     });
   }
