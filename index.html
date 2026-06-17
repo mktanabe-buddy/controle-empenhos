@@ -1607,13 +1607,71 @@ function normalizarData(val) {
   if(!val) return '';
   var s = String(val).trim();
   if(!s || s==='nan' || s==='undefined') return '';
-  // se for timestamp ISO
-  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
-  if(m) {
-    // formatar como DD/MM/AAAA
-    return m[3]+'/'+m[2]+'/'+m[1];
-  }
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[3]+'/'+m[2]+'/'+m[1];
   return s;
+}
+
+function mapearColunasPorCabecalho(header) {
+  // Mapeamento 100% dinâmico pelo cabeçalho — sem posições fixas
+  var cm = {
+    cliente:-1, cnpj:-1, cadastro:-1, valor:-1, nf:-1,
+    tipoVenda:-1, custoAq:-1, custoLog:-1, custoAdic:-1, custoTotal:-1,
+    margem:-1, pctCom:-1, comissaoCalc:-1, dataReceb:-1
+  };
+
+  for(var j=0; j<header.length; j++){
+    var hl = String(header[j]||'').toLowerCase().trim()
+              .normalize('NFD').replace(/[\u0300-\u036f]/g,''); // remove acentos
+
+    if(hl===''||hl==='nan') continue;
+
+    // Cliente
+    if(hl==='cliente') cm.cliente=j;
+    // CNPJ
+    else if(hl==='cnpj'||hl==='cpf/cnpj') cm.cnpj=j;
+    // Cadastro
+    else if(hl==='cadastro'||hl==='cod'||hl==='codigo') cm.cadastro=j;
+    // Valor
+    else if(hl==='valor'||hl==='valor nf'||hl==='valor total') cm.valor=j;
+    // NF
+    else if(hl==='n/f torino'||hl==='nf torino'||hl==='nota'||hl==='nf'||hl==='numero nf'||hl==='n/f') cm.nf=j;
+    // Tipo de venda
+    else if(hl==='tipo da venda'||hl==='tipo venda'||hl==='tipo') cm.tipoVenda=j;
+    // Custo aquisição
+    else if(hl.includes('custo')&&hl.includes('aqu')) cm.custoAq=j;
+    // Custo logístico
+    else if(hl.includes('custo')&&(hl.includes('log')||hl.includes('frete'))) cm.custoLog=j;
+    // Custo adicional
+    else if(hl.includes('custo')&&(hl.includes('adic')||hl.includes('extra'))) cm.custoAdic=j;
+    // Custo total
+    else if(hl.includes('custo')&&hl.includes('total')) cm.custoTotal=j;
+    // Margem
+    else if(hl==='margem'||hl==='margem bruta'||hl==='margem %') cm.margem=j;
+    // % Comissão
+    else if((hl.includes('comiss')&&hl.includes('aplic'))||(hl.includes('comiss')&&hl.includes('%'))||hl==='% comissao') cm.pctCom=j;
+    // Comissão calculada/vendas
+    else if(hl.includes('comiss')&&(hl.includes('vend')||hl.includes('calc')||hl.includes('valor'))) cm.comissaoCalc=j;
+    // Data recebimento
+    else if(hl.includes('data')&&hl.includes('receb')) cm.dataReceb=j;
+    else if(hl==='data recebimento'||hl==='data pgto'||hl==='data pagamento') cm.dataReceb=j;
+  }
+
+  // fallback comissaoCalc: se não encontrou por nome específico,
+  // procurar qualquer coluna com "comiss" que não seja a de % aplicável
+  if(cm.comissaoCalc<0){
+    for(var j=0;j<header.length;j++){
+      var hl=String(header[j]||'').toLowerCase().trim()
+              .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(hl.includes('comiss') && j!==cm.pctCom){
+        cm.comissaoCalc=j;
+        break;
+      }
+    }
+  }
+
+  console.log('[Colunas mapeadas]', JSON.stringify(cm));
+  return cm;
 }
 
 function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
@@ -1632,58 +1690,43 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
   }
   if(headerRow<0) headerRow=1;
 
-  // 2. mapear colunas pelo cabeçalho
-  var header = data[headerRow] || [];
-  var cm = {cliente:-1,cnpj:-1,cadastro:-1,valor:-1,nf:-1,tipoVenda:-1,
-            custoAq:-1,margem:-1,pctCom:-1,comissaoCalc:-1,dataReceb:-1};
-  for(var j=0;j<header.length;j++){
-    var hl = String(header[j]||'').toLowerCase().trim();
-    if(hl==='cliente') cm.cliente=j;
-    else if(hl==='cnpj') cm.cnpj=j;
-    else if(hl==='cadastro') cm.cadastro=j;
-    else if(hl==='valor') cm.valor=j;
-    else if(hl.includes('n/f')||hl.includes('nf torino')) cm.nf=j;
-    else if(hl.includes('tipo da venda')||hl==='tipo') cm.tipoVenda=j;
-    else if(hl.includes('custo aq')) cm.custoAq=j;
-    else if(hl==='margem') cm.margem=j;
-    else if(hl.includes('comiss')&&hl.includes('aplic')) cm.pctCom=j;
-    else if(hl.includes('comiss')&&hl.includes('vend')) cm.comissaoCalc=j;
-    else if(hl.includes('data')||hl.includes('receb')) cm.dataReceb=j;
-  }
-  // fallback posições fixas
-  if(cm.cliente<0)cm.cliente=1;
-  if(cm.cnpj<0)cm.cnpj=2;
-  if(cm.cadastro<0)cm.cadastro=3;
-  if(cm.valor<0)cm.valor=4;
-  if(cm.nf<0)cm.nf=5;
-  if(cm.tipoVenda<0)cm.tipoVenda=6;
-  if(cm.custoAq<0)cm.custoAq=7;
-  if(cm.margem<0)cm.margem=11;
-  if(cm.pctCom<0)cm.pctCom=12;
-  if(cm.comissaoCalc<0)cm.comissaoCalc=13;
-  if(cm.dataReceb<0)cm.dataReceb=14;
+  // 2. mapear colunas
+  var cm = mapearColunasPorCabecalho(data[headerRow]||[]);
 
-  // 3. Para planilha DEVOLVIDA: identificar bloco 1 (liberadas)
-  // Bloco 1 = do headerRow+1 até primeira linha onde CLIENTE e NF estão vazios
+  // 3. validar mapeamento mínimo
+  if(cm.cliente<0||cm.nf<0){
+    throw new Error('Não foi possível identificar as colunas Cliente e NF no cabeçalho. Verifique o formato da planilha.');
+  }
+
+  // 4. detectar bloco liberado (planilha devolvida)
   var bloco1End = -1;
   if(tipo==='devolvida'){
     for(var i=headerRow+1;i<data.length;i++){
       var row=data[i]||[];
-      var cliVal=row[cm.cliente];
-      var nfVal=row[cm.nf];
-      var cliStr=cliVal!==undefined&&cliVal!==null?String(cliVal).trim():'';
-      var nfStr=nfVal!==undefined&&nfVal!==null?String(nfVal).trim():'';
-      var cliVazio=!cliStr||cliStr===''||cliStr==='nan'||cliStr==='undefined'||cliStr==='null';
-      var nfVazio=!nfStr||nfStr===''||nfStr==='nan'||nfStr==='undefined'||nfStr==='null';
-      if(cliVazio && nfVazio){
-        bloco1End = i;
+      var cliStr=String(row[cm.cliente]||'').trim().toUpperCase();
+      // detectar linha TOTAL
+      if(cliStr==='TOTAL'||cliStr.startsWith('TOTAL')){
+        bloco1End=i;
+        console.log('[Parser] TOTAL linha',i,'->',bloco1End-headerRow-1,'NFs liberadas');
         break;
       }
     }
-    console.log('[Comissões] bloco1End linha:', bloco1End, '| dados bloco1:', bloco1End-headerRow-1, 'NFs liberadas');
+    // fallback: linha vazia
+    if(bloco1End<0){
+      for(var i=headerRow+1;i<data.length;i++){
+        var row=data[i]||[];
+        var cliStr=String(row[cm.cliente]||'').trim();
+        var nfStr=cm.nf>=0?String(row[cm.nf]||'').trim():'';
+        if((!cliStr||cliStr==='nan')&&(!nfStr||nfStr==='nan')){
+          bloco1End=i;
+          console.log('[Parser] linha vazia',i,'->',bloco1End-headerRow-1,'NFs liberadas');
+          break;
+        }
+      }
+    }
   }
 
-  // 4. helper para parsear número
+  // 5. helper numérico
   function parseNum(raw){
     if(raw===undefined||raw===null)return 0;
     if(typeof raw==='number')return raw;
@@ -1691,75 +1734,56 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
     return parseFloat(s)||0;
   }
 
-  // 5. processar linhas
+  // 6. processar linhas
   for(var i=headerRow+1;i<data.length;i++){
     var row=data[i]||[];
-    var cliRaw=row[cm.cliente];
-    var nfRaw=row[cm.nf];
-    var cli=cliRaw!==undefined&&cliRaw!==null?String(cliRaw).trim():'';
-    var nf=nfRaw!==undefined&&nfRaw!==null?String(nfRaw).trim():'';
+    var cli=cm.cliente>=0?String(row[cm.cliente]||'').trim():'';
+    var nf=cm.nf>=0?(row[cm.nf]!==undefined&&row[cm.nf]!==null?String(row[cm.nf]).trim():''):'';
 
-    // pular linhas sem cliente ou sem NF
     if(!cli||cli===''||cli==='nan'||cli==='undefined')continue;
     if(!nf||nf===''||nf==='nan'||nf==='undefined')continue;
-    if(cli.toUpperCase().includes('TOTAL'))continue;
+    if(cli.toUpperCase().startsWith('TOTAL'))continue;
 
-    var dataRecebRaw=row[cm.dataReceb];
-    var dataReceb=dataRecebRaw!==undefined&&dataRecebRaw!==null?String(dataRecebRaw).trim():'';
-    // normalizar timestamp de data
-    dataReceb=normalizarData(dataReceb);
-    // pular linha de cabeçalho repetida
+    var dataReceb=cm.dataReceb>=0?(row[cm.dataReceb]!==undefined&&row[cm.dataReceb]!==null?normalizarData(String(row[cm.dataReceb]).trim()):''):'';
     if(dataReceb.toUpperCase().includes('DATA RECEB'))continue;
 
-    // 6. determinar statusNF
+    // status
     var statusNF;
     if(tipo==='devolvida'){
-      if(bloco1End>0 && i<bloco1End){
-        statusNF='liberada'; // bloco 1 = liberadas
-      }else{
-        var drUp=dataReceb.toUpperCase();
-        if(drUp.includes('CANCELADA'))statusNF='cancelada';
-        else statusNF='aberto';
-      }
+      statusNF = (bloco1End>0 && i<bloco1End) ? 'liberada'
+                 : (dataReceb.toUpperCase().includes('CANCELADA') ? 'cancelada' : 'aberto');
     }else{
-      // planilha ENVIADA: TODAS sem retorno — não existe liberação ainda
-      var drUp=dataReceb.toUpperCase();
-      if(drUp.includes('CANCELADA'))statusNF='cancelada';
-      else statusNF='sem_retorno';
+      statusNF = dataReceb.toUpperCase().includes('CANCELADA') ? 'cancelada' : 'sem_retorno';
     }
 
-    var valor=parseNum(row[cm.valor]);
-    var custoAq=parseNum(row[cm.custoAq]);
-    var comissaoCalc=parseNum(row[cm.comissaoCalc]);
+    var valor = cm.valor>=0 ? parseNum(row[cm.valor]) : 0;
+    var custoAq = cm.custoAq>=0 ? parseNum(row[cm.custoAq]) : 0;
+    var comissaoCalc = cm.comissaoCalc>=0 ? parseNum(row[cm.comissaoCalc]) : 0;
 
     var margem=0;
-    var mRaw=row[cm.margem];
-    if(mRaw!==undefined&&mRaw!==null){
-      if(typeof mRaw==='number'){margem=mRaw>1?mRaw/100:mRaw;}
-      else{var ms=String(mRaw).replace('%','').replace(',','.');margem=parseFloat(ms)||0;if(margem>1)margem=margem/100;}
-    }
-
-    // pctComissao: normalizar para formato "2%"
-    var pctCom='2%';
-    var pRaw=row[cm.pctCom];
-    if(pRaw!==undefined&&pRaw!==null&&String(pRaw).trim()!==''){
-      var pStr=String(pRaw).trim();
-      if(pStr.includes('%')){pctCom=pStr;}
-      else{
-        var pNum=parseFloat(pStr);
-        if(!isNaN(pNum)){pctCom=(pNum>1?pNum:pNum*100).toFixed(0)+'%';}
+    if(cm.margem>=0){
+      var mRaw=row[cm.margem];
+      if(mRaw!==undefined&&mRaw!==null){
+        if(typeof mRaw==='number'){margem=mRaw>1?mRaw/100:mRaw;}
+        else{var ms=String(mRaw).replace('%','').replace(',','.');margem=parseFloat(ms)||0;if(margem>1)margem=margem/100;}
       }
     }
 
-    var tipoVenda=String(row[cm.tipoVenda]||'').trim();
+    var pctCom='2%';
+    if(cm.pctCom>=0){
+      var pRaw=row[cm.pctCom];
+      if(pRaw!==undefined&&pRaw!==null&&String(pRaw).trim()!==''){
+        var pStr=String(pRaw).trim();
+        if(pStr.includes('%')){pctCom=pStr;}
+        else{var pNum=parseFloat(pStr);if(!isNaN(pNum)){pctCom=(pNum>1?pNum:pNum*100).toFixed(0)+'%';}}
+      }
+    }
+
+    var tipoVenda=cm.tipoVenda>=0?String(row[cm.tipoVenda]||'').trim():'';
     if(tipoVenda==='nan'||tipoVenda==='undefined')tipoVenda='';
 
-    // comissão liberada: apenas bloco 1 da devolvida
     var comissaoLib=0;
     if(tipo==='devolvida'&&statusNF==='liberada') comissaoLib=comissaoCalc;
-
-    // planilha onde foi liberada
-    var planilhaLib=statusNF==='liberada'?mesano:'';
 
     rows.push({
       id: Date.now().toString()+Math.random().toString(36).substr(2,4)+'_'+i,
@@ -1769,8 +1793,8 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
       tipo: tipo,
       statusPlanilha: statusNF==='liberada'?'liberada':(statusNF==='cancelada'?'cancelada':(tipo==='devolvida'?'aberto':'sem_retorno')),
       cliente: cli,
-      cnpj: String(row[cm.cnpj]||'').trim(),
-      cadastro: String(row[cm.cadastro]||'').trim(),
+      cnpj: cm.cnpj>=0?String(row[cm.cnpj]||'').trim():'',
+      cadastro: cm.cadastro>=0?String(row[cm.cadastro]||'').trim():'',
       valor: valor,
       nfTorino: nf,
       tipoVenda: tipoVenda,
@@ -1781,7 +1805,7 @@ function parsearPlanilhaComissao(data, vendedor, mesano, tipo) {
       comissaoLib: comissaoLib,
       dataReceb: dataReceb,
       statusNF: statusNF,
-      planilhaLib: planilhaLib,
+      planilhaLib: statusNF==='liberada'?mesano:'',
       importadoEm: new Date().toISOString()
     });
   }
