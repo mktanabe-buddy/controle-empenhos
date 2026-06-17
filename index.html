@@ -1605,19 +1605,26 @@ function normalizarMesAno(mesano) {
 
 function normalizarData(val) {
   if(!val) return '';
-  // número serial do Excel (raw:true) — converter para data
-  if(typeof val==='number' && val>40000 && val<60000){
-    var d = new Date(Math.round((val - 25569)*86400*1000));
-    var dd = String(d.getUTCDate()).padStart(2,'0');
-    var mm = String(d.getUTCMonth()+1).padStart(2,'0');
-    var yyyy = d.getUTCFullYear();
-    return dd+'/'+mm+'/'+yyyy;
+  // objeto Date do JS (SheetJS raw:true retorna Date para células de data)
+  if(val instanceof Date){
+    var dd=String(val.getDate()).padStart(2,'0');
+    var mm=String(val.getMonth()+1).padStart(2,'0');
+    var aa=String(val.getFullYear()).slice(-2);
+    return dd+'/'+mm+'/'+aa;
   }
-  var s = String(val).trim();
-  if(!s || s==='nan' || s==='undefined') return '';
+  // número serial do Excel
+  if(typeof val==='number' && val>40000 && val<60000){
+    var d=new Date(Math.round((val-25569)*86400*1000));
+    var dd=String(d.getUTCDate()).padStart(2,'0');
+    var mm=String(d.getUTCMonth()+1).padStart(2,'0');
+    var aa=String(d.getUTCFullYear()).slice(-2);
+    return dd+'/'+mm+'/'+aa;
+  }
+  var s=String(val).trim();
+  if(!s||s==='nan'||s==='undefined') return '';
   // timestamp ISO
-  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(m) return m[3]+'/'+m[2]+'/'+m[1];
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[3]+'/'+m[2]+'/'+String(m[1]).slice(-2);
   return s;
 }
 
